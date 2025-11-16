@@ -677,7 +677,7 @@
     </div>
 
     <script>
-        // Version: 1.1.0 - Fixed clobTokenIds array handling
+        // Version: 1.2.0 - Fixed JSON string parsing for clobTokenIds and outcomes
         // Визначаємо API base URL
         // Якщо сторінка відкрита через HTTP сервер, використовуємо локальний проксі
         // Інакше намагаємось звертатися напряму (може не працювати через CORS)
@@ -1106,7 +1106,15 @@
             // Забезпечуємо що outcomes є масивом
             let outcomes = market.outcomes || [];
             if (!Array.isArray(outcomes)) {
-                if (typeof outcomes === 'object' && outcomes !== null) {
+                if (typeof outcomes === 'string') {
+                    // Спроба парсити як JSON якщо це JSON строка
+                    try {
+                        const parsed = JSON.parse(outcomes);
+                        outcomes = Array.isArray(parsed) ? parsed : [outcomes];
+                    } catch {
+                        outcomes = [outcomes];
+                    }
+                } else if (typeof outcomes === 'object' && outcomes !== null) {
                     outcomes = Object.values(outcomes);
                 } else {
                     outcomes = [];
@@ -1118,10 +1126,17 @@
             // Забезпечуємо що clobTokenIds є масивом
             let clobTokenIds = market.clobTokenIds || [];
             if (!Array.isArray(clobTokenIds)) {
-                if (typeof clobTokenIds === 'object' && clobTokenIds !== null) {
+                if (typeof clobTokenIds === 'string') {
+                    // Спроба парсити як JSON якщо це JSON строка
+                    try {
+                        const parsed = JSON.parse(clobTokenIds);
+                        clobTokenIds = Array.isArray(parsed) ? parsed : [clobTokenIds];
+                    } catch {
+                        // Якщо не JSON, просто обгортаємо в масив
+                        clobTokenIds = [clobTokenIds];
+                    }
+                } else if (typeof clobTokenIds === 'object' && clobTokenIds !== null) {
                     clobTokenIds = Object.values(clobTokenIds);
-                } else if (typeof clobTokenIds === 'string') {
-                    clobTokenIds = [clobTokenIds];
                 } else {
                     clobTokenIds = [];
                 }
@@ -1186,10 +1201,17 @@
                 // Забезпечуємо що clobTokenIds є масивом
                 let clobTokenIds = market.clobTokenIds || [];
                 if (!Array.isArray(clobTokenIds)) {
-                    if (typeof clobTokenIds === 'object' && clobTokenIds !== null) {
+                    if (typeof clobTokenIds === 'string') {
+                        // Спроба парсити як JSON якщо це JSON строка
+                        try {
+                            const parsed = JSON.parse(clobTokenIds);
+                            clobTokenIds = Array.isArray(parsed) ? parsed : [clobTokenIds];
+                        } catch {
+                            // Якщо не JSON, просто обгортаємо в масив
+                            clobTokenIds = [clobTokenIds];
+                        }
+                    } else if (typeof clobTokenIds === 'object' && clobTokenIds !== null) {
                         clobTokenIds = Object.values(clobTokenIds);
-                    } else if (typeof clobTokenIds === 'string') {
-                        clobTokenIds = [clobTokenIds];
                     } else {
                         clobTokenIds = [];
                     }
@@ -1198,7 +1220,15 @@
                 // Забезпечуємо що outcomes є масивом
                 let outcomes = market.outcomes || [];
                 if (!Array.isArray(outcomes)) {
-                    if (typeof outcomes === 'object' && outcomes !== null) {
+                    if (typeof outcomes === 'string') {
+                        // Спроба парсити як JSON якщо це JSON строка
+                        try {
+                            const parsed = JSON.parse(outcomes);
+                            outcomes = Array.isArray(parsed) ? parsed : [outcomes];
+                        } catch {
+                            outcomes = [outcomes];
+                        }
+                    } else if (typeof outcomes === 'object' && outcomes !== null) {
                         outcomes = Object.values(outcomes);
                     } else {
                         outcomes = [];
