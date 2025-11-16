@@ -13,6 +13,7 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Дозволяємо CORS для всіх маршрутів
 
 POLYMARKET_API = 'https://gamma-api.polymarket.com'
+CLOB_API = 'https://clob.polymarket.com'
 
 @app.route('/')
 def index():
@@ -54,12 +55,58 @@ def get_markets():
         print(f"Unexpected error: {e}", file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/price')
+def get_price():
+    """Проксі для /price endpoint (CLOB API)"""
+    try:
+        params = request.args.to_dict()
+        response = requests.get(f'{CLOB_API}/price', params=params, timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching price: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/book')
+def get_book():
+    """Проксі для /book endpoint (CLOB API) - order book"""
+    try:
+        params = request.args.to_dict()
+        response = requests.get(f'{CLOB_API}/book', params=params, timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching order book: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/midpoint')
+def get_midpoint():
+    """Проксі для /midpoint endpoint (CLOB API)"""
+    try:
+        params = request.args.to_dict()
+        response = requests.get(f'{CLOB_API}/midpoint', params=params, timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching midpoint: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/health')
 def health():
     """Перевірка здоров'я сервера"""
     return jsonify({
         'status': 'healthy',
-        'polymarket_api': POLYMARKET_API
+        'polymarket_api': POLYMARKET_API,
+        'clob_api': CLOB_API
     })
 
 if __name__ == '__main__':

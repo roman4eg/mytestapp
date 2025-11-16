@@ -392,6 +392,176 @@
             margin-bottom: 20px;
         }
 
+        /* Стилі для коефіцієнтів та цін */
+        .price-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .price-bar {
+            flex: 1;
+            height: 24px;
+            background: #f0f0f0;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .price-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+        }
+
+        .price-percentage {
+            color: white;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+
+        .price-value {
+            min-width: 60px;
+            text-align: right;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        /* Стилі для стакану цін (order book) */
+        .orderbook-container {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .orderbook-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .orderbook {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .orderbook-side {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .orderbook-side-title {
+            padding: 8px 12px;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .orderbook-bids .orderbook-side-title {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .orderbook-asks .orderbook-side-title {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .orderbook-rows {
+            font-size: 0.85em;
+        }
+
+        .orderbook-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            padding: 6px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .orderbook-row:last-child {
+            border-bottom: none;
+        }
+
+        .orderbook-price {
+            font-weight: 600;
+        }
+
+        .orderbook-bids .orderbook-price {
+            color: #28a745;
+        }
+
+        .orderbook-asks .orderbook-price {
+            color: #dc3545;
+        }
+
+        .orderbook-size {
+            text-align: right;
+            color: #666;
+        }
+
+        .orderbook-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            padding: 6px 12px;
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .orderbook-header-size {
+            text-align: right;
+        }
+
+        .liquidity-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .liquidity-high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .liquidity-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .liquidity-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading-prices {
+            text-align: center;
+            padding: 15px;
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .price-error {
+            background: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
         @media (max-width: 768px) {
             .events-grid {
                 grid-template-columns: 1fr;
@@ -408,6 +578,20 @@
 
             .stats {
                 grid-template-columns: 1fr;
+            }
+
+            .orderbook {
+                grid-template-columns: 1fr;
+            }
+
+            .price-indicator {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .price-value {
+                text-align: left;
+                margin-top: 5px;
             }
         }
     </style>
@@ -507,6 +691,146 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // ===== Функції для роботи з цінами та ліквідністю =====
+
+        // Завантажити ціну для token
+        async function loadPrice(tokenId, side = 'BUY') {
+            try {
+                const response = await fetch(`${API_BASE}/price?token_id=${tokenId}&side=${side}`);
+                if (!response.ok) throw new Error('Failed to fetch price');
+                return await response.json();
+            } catch (error) {
+                console.error(`Error loading price for ${tokenId}:`, error);
+                return null;
+            }
+        }
+
+        // Завантажити середню ціну (midpoint)
+        async function loadMidpoint(tokenId) {
+            try {
+                const response = await fetch(`${API_BASE}/midpoint?token_id=${tokenId}`);
+                if (!response.ok) throw new Error('Failed to fetch midpoint');
+                return await response.json();
+            } catch (error) {
+                console.error(`Error loading midpoint for ${tokenId}:`, error);
+                return null;
+            }
+        }
+
+        // Завантажити order book
+        async function loadOrderBook(tokenId) {
+            try {
+                const response = await fetch(`${API_BASE}/book?token_id=${tokenId}`);
+                if (!response.ok) throw new Error('Failed to fetch order book');
+                return await response.json();
+            } catch (error) {
+                console.error(`Error loading order book for ${tokenId}:`, error);
+                return null;
+            }
+        }
+
+        // Створити HTML для відображення ціни з progress bar
+        function createPriceDisplay(outcomeName, probability) {
+            const percentage = (probability * 100).toFixed(1);
+            return `
+                <div class="price-indicator">
+                    <div style="min-width: 100px; font-weight: 500;">${escapeHtml(outcomeName)}:</div>
+                    <div class="price-bar">
+                        <div class="price-fill" style="width: ${percentage}%">
+                            <span class="price-percentage">${percentage}%</span>
+                        </div>
+                    </div>
+                    <div class="price-value">$${probability.toFixed(3)}</div>
+                </div>
+            `;
+        }
+
+        // Розрахувати ліквідність на основі order book
+        function calculateLiquidity(orderBook) {
+            if (!orderBook || !orderBook.bids || !orderBook.asks) {
+                return { level: 'unknown', totalVolume: 0 };
+            }
+
+            const bidsVolume = orderBook.bids.reduce((sum, bid) => sum + parseFloat(bid.size || 0), 0);
+            const asksVolume = orderBook.asks.reduce((sum, ask) => sum + parseFloat(ask.size || 0), 0);
+            const totalVolume = bidsVolume + asksVolume;
+
+            let level = 'low';
+            if (totalVolume > 10000) level = 'high';
+            else if (totalVolume > 1000) level = 'medium';
+
+            return { level, totalVolume, bidsVolume, asksVolume };
+        }
+
+        // Створити HTML для індикатора ліквідності
+        function createLiquidityIndicator(liquidity) {
+            const labels = {
+                high: 'Висока ліквідність',
+                medium: 'Середня ліквідність',
+                low: 'Низька ліквідність',
+                unknown: 'Ліквідність невідома'
+            };
+
+            const icons = {
+                high: '💎',
+                medium: '💧',
+                low: '⚠️',
+                unknown: '❓'
+            };
+
+            return `
+                <span class="liquidity-indicator liquidity-${liquidity.level}">
+                    ${icons[liquidity.level]} ${labels[liquidity.level]}
+                    ${liquidity.totalVolume > 0 ? ` ($${liquidity.totalVolume.toFixed(0)})` : ''}
+                </span>
+            `;
+        }
+
+        // Створити HTML для order book
+        function createOrderBookDisplay(orderBook) {
+            if (!orderBook || !orderBook.bids || !orderBook.asks) {
+                return '<div class="price-error">Order book недоступний</div>';
+            }
+
+            const bids = orderBook.bids.slice(0, 5); // Топ 5 bid ордерів
+            const asks = orderBook.asks.slice(0, 5); // Топ 5 ask ордерів
+
+            return `
+                <div class="orderbook">
+                    <div class="orderbook-side orderbook-bids">
+                        <div class="orderbook-side-title">Купівля (Bids)</div>
+                        <div class="orderbook-header">
+                            <div>Ціна</div>
+                            <div class="orderbook-header-size">Об'єм</div>
+                        </div>
+                        <div class="orderbook-rows">
+                            ${bids.length > 0 ? bids.map(bid => `
+                                <div class="orderbook-row">
+                                    <div class="orderbook-price">$${parseFloat(bid.price).toFixed(3)}</div>
+                                    <div class="orderbook-size">${parseFloat(bid.size).toFixed(0)}</div>
+                                </div>
+                            `).join('') : '<div style="padding: 10px; text-align: center; color: #999;">Немає ордерів</div>'}
+                        </div>
+                    </div>
+                    <div class="orderbook-side orderbook-asks">
+                        <div class="orderbook-side-title">Продаж (Asks)</div>
+                        <div class="orderbook-header">
+                            <div>Ціна</div>
+                            <div class="orderbook-header-size">Об'єм</div>
+                        </div>
+                        <div class="orderbook-rows">
+                            ${asks.length > 0 ? asks.map(ask => `
+                                <div class="orderbook-row">
+                                    <div class="orderbook-price">$${parseFloat(ask.price).toFixed(3)}</div>
+                                    <div class="orderbook-size">${parseFloat(ask.size).toFixed(0)}</div>
+                                </div>
+                            `).join('') : '<div style="padding: 10px; text-align: center; color: #999;">Немає ордерів</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         // Перевірка чи сторінка відкрита правильно
@@ -752,7 +1076,7 @@
                     <div>
                         <h3 style="margin-bottom: 15px;">Всі ринки (${markets.length}):</h3>
                         <div style="display: flex; flex-direction: column; gap: 15px;">
-                            ${markets.map(market => createMarketDetail(market)).join('')}
+                            ${markets.map((market, index) => createMarketDetail(market, index)).join('')}
                         </div>
                     </div>
                 ` : ''}
@@ -774,7 +1098,7 @@
             modal.style.display = 'block';
         }
 
-        function createMarketDetail(market) {
+        function createMarketDetail(market, marketIndex) {
             // Забезпечуємо що outcomes є масивом
             let outcomes = market.outcomes || [];
             if (!Array.isArray(outcomes)) {
@@ -786,14 +1110,37 @@
             }
 
             const groupItemTitle = market.groupItemTitle || market.question || 'Без питання';
+            const clobTokenIds = market.clobTokenIds || [];
+            const marketId = market.id || marketIndex;
 
-            return `
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #667eea;">
+            // Базовий HTML ринку
+            let html = `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #667eea;" id="market-${marketId}">
                     <div style="font-weight: 600; color: #333; margin-bottom: 10px;">${escapeHtml(groupItemTitle)}</div>
 
                     ${market.description ? `<div style="color: #666; font-size: 0.9em; margin-bottom: 10px;">${escapeHtml(market.description)}</div>` : ''}
 
-                    ${outcomes.length > 0 ? `
+                    <div style="margin-top: 10px; font-size: 0.85em; color: #999;">
+                        Статус: ${market.active ? '✅ Активний' : '❌ Неактивний'}
+                        ${market.closed ? ' | Закритий' : ''}
+                    </div>
+            `;
+
+            // Якщо є token IDs, показуємо ціни
+            if (clobTokenIds.length > 0) {
+                html += `
+                    <div id="prices-${marketId}" style="margin-top: 15px;">
+                        <div class="loading-prices">⏳ Завантаження цін...</div>
+                    </div>
+                    <div id="orderbook-${marketId}" style="margin-top: 10px;"></div>
+                `;
+
+                // Асинхронно завантажуємо ціни
+                setTimeout(() => loadMarketPrices(market, marketId), 100);
+            } else {
+                // Показуємо outcomes як раніше
+                if (outcomes.length > 0) {
+                    html += `
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
                             ${outcomes.map(outcome => {
                                 const outcomeName = typeof outcome === 'string' ? outcome : (outcome.name || outcome.title || JSON.stringify(outcome));
@@ -804,14 +1151,68 @@
                                 `;
                             }).join('')}
                         </div>
-                    ` : ''}
+                    `;
+                }
+            }
 
-                    <div style="margin-top: 10px; font-size: 0.85em; color: #999;">
-                        Статус: ${market.active ? '✅ Активний' : '❌ Неактивний'}
-                        ${market.closed ? ' | Закритий' : ''}
-                    </div>
-                </div>
-            `;
+            html += `</div>`;
+            return html;
+        }
+
+        // Завантажити ціни для ринку
+        async function loadMarketPrices(market, marketId) {
+            const pricesContainer = document.getElementById(`prices-${marketId}`);
+            const orderbookContainer = document.getElementById(`orderbook-${marketId}`);
+
+            if (!pricesContainer) return;
+
+            try {
+                const clobTokenIds = market.clobTokenIds || [];
+                const outcomes = market.outcomes || [];
+
+                if (clobTokenIds.length === 0) {
+                    pricesContainer.innerHTML = '<div class="price-error">Token IDs недоступні</div>';
+                    return;
+                }
+
+                // Завантажуємо midpoint для кожного outcome
+                const pricePromises = clobTokenIds.map(tokenId => loadMidpoint(tokenId));
+                const prices = await Promise.all(pricePromises);
+
+                // Відображаємо ціни
+                let pricesHtml = '<div style="margin-bottom: 10px;">';
+                prices.forEach((priceData, index) => {
+                    if (priceData && priceData.mid) {
+                        const outcomeName = outcomes[index] || `Outcome ${index + 1}`;
+                        const probability = parseFloat(priceData.mid);
+                        pricesHtml += createPriceDisplay(outcomeName, probability);
+                    }
+                });
+                pricesHtml += '</div>';
+
+                pricesContainer.innerHTML = pricesHtml;
+
+                // Завантажуємо order book для першого token (основний ринок)
+                if (clobTokenIds.length > 0) {
+                    const orderBook = await loadOrderBook(clobTokenIds[0]);
+                    if (orderBook) {
+                        const liquidity = calculateLiquidity(orderBook);
+                        orderbookContainer.innerHTML = `
+                            <div class="orderbook-container">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <div class="orderbook-title">Стакан цін</div>
+                                    ${createLiquidityIndicator(liquidity)}
+                                </div>
+                                ${createOrderBookDisplay(orderBook)}
+                            </div>
+                        `;
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error loading market prices:', error);
+                pricesContainer.innerHTML = '<div class="price-error">Помилка завантаження цін</div>';
+            }
         }
 
         function closeModal(event) {

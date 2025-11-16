@@ -12,6 +12,7 @@ const path = require('path');
 const app = express();
 const PORT = 5000;
 const POLYMARKET_API = 'https://gamma-api.polymarket.com';
+const CLOB_API = 'https://clob.polymarket.com';
 
 // Middleware
 app.use(cors());
@@ -69,11 +70,81 @@ app.get('/api/markets', async (req, res) => {
     }
 });
 
+// Проксі для /price endpoint (CLOB API)
+app.get('/api/price', async (req, res) => {
+    try {
+        const response = await axios.get(`${CLOB_API}/price`, {
+            params: req.query,
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching price:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Проксі для /book endpoint (CLOB API) - order book
+app.get('/api/book', async (req, res) => {
+    try {
+        const response = await axios.get(`${CLOB_API}/book`, {
+            params: req.query,
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching order book:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Проксі для /midpoint endpoint (CLOB API)
+app.get('/api/midpoint', async (req, res) => {
+    try {
+        const response = await axios.get(`${CLOB_API}/midpoint`, {
+            params: req.query,
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching midpoint:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
         polymarket_api: POLYMARKET_API,
+        clob_api: CLOB_API,
         uptime: process.uptime()
     });
 });
