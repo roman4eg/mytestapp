@@ -1110,7 +1110,19 @@
             }
 
             const groupItemTitle = market.groupItemTitle || market.question || 'Без питання';
-            const clobTokenIds = market.clobTokenIds || [];
+
+            // Забезпечуємо що clobTokenIds є масивом
+            let clobTokenIds = market.clobTokenIds || [];
+            if (!Array.isArray(clobTokenIds)) {
+                if (typeof clobTokenIds === 'object' && clobTokenIds !== null) {
+                    clobTokenIds = Object.values(clobTokenIds);
+                } else if (typeof clobTokenIds === 'string') {
+                    clobTokenIds = [clobTokenIds];
+                } else {
+                    clobTokenIds = [];
+                }
+            }
+
             const marketId = market.id || marketIndex;
 
             // Базовий HTML ринку
@@ -1167,8 +1179,27 @@
             if (!pricesContainer) return;
 
             try {
-                const clobTokenIds = market.clobTokenIds || [];
-                const outcomes = market.outcomes || [];
+                // Забезпечуємо що clobTokenIds є масивом
+                let clobTokenIds = market.clobTokenIds || [];
+                if (!Array.isArray(clobTokenIds)) {
+                    if (typeof clobTokenIds === 'object' && clobTokenIds !== null) {
+                        clobTokenIds = Object.values(clobTokenIds);
+                    } else if (typeof clobTokenIds === 'string') {
+                        clobTokenIds = [clobTokenIds];
+                    } else {
+                        clobTokenIds = [];
+                    }
+                }
+
+                // Забезпечуємо що outcomes є масивом
+                let outcomes = market.outcomes || [];
+                if (!Array.isArray(outcomes)) {
+                    if (typeof outcomes === 'object' && outcomes !== null) {
+                        outcomes = Object.values(outcomes);
+                    } else {
+                        outcomes = [];
+                    }
+                }
 
                 if (clobTokenIds.length === 0) {
                     pricesContainer.innerHTML = '<div class="price-error">Token IDs недоступні</div>';
