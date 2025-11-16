@@ -501,6 +501,14 @@
         let allEvents = [];
         let filteredEvents = [];
 
+        // Функція для екранування HTML спецсимволів
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return text;
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         // Перевірка чи сторінка відкрита правильно
         function checkServerStatus() {
             if (!isLocalServer) {
@@ -617,12 +625,12 @@
             const statusText = event.closed ? 'Закрито' : 'Активно';
 
             return `
-                <div class="event-card" onclick="showEventDetails('${event.id}')">
-                    ${imageUrl ? `<img src="${imageUrl}" alt="${event.title}" class="event-image" onerror="this.style.display='none'">` : ''}
+                <div class="event-card" onclick="showEventDetails('${escapeHtml(event.id)}')">
+                    ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(event.title)}" class="event-image" onerror="this.style.display='none'">` : ''}
 
-                    <div class="event-title">${event.title || 'Без назви'}</div>
+                    <div class="event-title">${escapeHtml(event.title || 'Без назви')}</div>
 
-                    ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
+                    ${event.description ? `<div class="event-description">${escapeHtml(event.description)}</div>` : ''}
 
                     <div class="event-meta">
                         <div class="meta-item">
@@ -640,7 +648,7 @@
 
                     ${tags.length > 0 ? `
                         <div class="tags">
-                            ${tags.slice(0, 3).map(tag => `<span class="tag">${tag.label || tag}</span>`).join('')}
+                            ${tags.slice(0, 3).map(tag => `<span class="tag">${escapeHtml(tag.label || tag)}</span>`).join('')}
                         </div>
                     ` : ''}
 
@@ -658,19 +666,32 @@
         }
 
         function createMarketPreview(market) {
-            const outcomes = market.outcomes || [];
+            // Забезпечуємо що outcomes є масивом
+            let outcomes = market.outcomes || [];
+            if (!Array.isArray(outcomes)) {
+                // Якщо outcomes - об'єкт, спробуємо отримати значення
+                if (typeof outcomes === 'object' && outcomes !== null) {
+                    outcomes = Object.values(outcomes);
+                } else {
+                    outcomes = [];
+                }
+            }
+
             const groupItemTitle = market.groupItemTitle || market.question || 'Без питання';
 
             return `
                 <div class="market-item">
-                    <div class="market-question">${groupItemTitle}</div>
+                    <div class="market-question">${escapeHtml(groupItemTitle)}</div>
                     ${outcomes.length > 0 ? `
                         <div class="market-outcomes">
-                            ${outcomes.map(outcome => `
-                                <div class="outcome">
-                                    <span class="outcome-name">${outcome}</span>
-                                </div>
-                            `).join('')}
+                            ${outcomes.map(outcome => {
+                                const outcomeName = typeof outcome === 'string' ? outcome : (outcome.name || outcome.title || JSON.stringify(outcome));
+                                return `
+                                    <div class="outcome">
+                                        <span class="outcome-name">${escapeHtml(outcomeName)}</span>
+                                    </div>
+                                `;
+                            }).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -689,11 +710,11 @@
             const imageUrl = event.image || event.icon || '';
 
             modalContent.innerHTML = `
-                ${imageUrl ? `<img src="${imageUrl}" alt="${event.title}" class="modal-image" onerror="this.style.display='none'">` : ''}
+                ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(event.title)}" class="modal-image" onerror="this.style.display='none'">` : ''}
 
-                <h2 style="color: #667eea; margin-bottom: 15px;">${event.title || 'Без назви'}</h2>
+                <h2 style="color: #667eea; margin-bottom: 15px;">${escapeHtml(event.title || 'Без назви')}</h2>
 
-                ${event.description ? `<p style="color: #666; line-height: 1.6; margin-bottom: 20px;">${event.description}</p>` : ''}
+                ${event.description ? `<p style="color: #666; line-height: 1.6; margin-bottom: 20px;">${escapeHtml(event.description)}</p>` : ''}
 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
@@ -722,7 +743,7 @@
                     <div style="margin-bottom: 20px;">
                         <h3 style="margin-bottom: 10px;">Теги:</h3>
                         <div class="tags">
-                            ${tags.map(tag => `<span class="tag">${tag.label || tag}</span>`).join('')}
+                            ${tags.map(tag => `<span class="tag">${escapeHtml(tag.label || tag)}</span>`).join('')}
                         </div>
                     </div>
                 ` : ''}
@@ -738,7 +759,7 @@
 
                 ${event.slug ? `
                     <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
-                        <a href="https://polymarket.com/event/${event.slug}" target="_blank"
+                        <a href="https://polymarket.com/event/${escapeHtml(event.slug)}" target="_blank"
                            style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                                   color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none;
                                   font-weight: 600; transition: transform 0.2s;"
@@ -754,22 +775,34 @@
         }
 
         function createMarketDetail(market) {
-            const outcomes = market.outcomes || [];
+            // Забезпечуємо що outcomes є масивом
+            let outcomes = market.outcomes || [];
+            if (!Array.isArray(outcomes)) {
+                if (typeof outcomes === 'object' && outcomes !== null) {
+                    outcomes = Object.values(outcomes);
+                } else {
+                    outcomes = [];
+                }
+            }
+
             const groupItemTitle = market.groupItemTitle || market.question || 'Без питання';
 
             return `
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #667eea;">
-                    <div style="font-weight: 600; color: #333; margin-bottom: 10px;">${groupItemTitle}</div>
+                    <div style="font-weight: 600; color: #333; margin-bottom: 10px;">${escapeHtml(groupItemTitle)}</div>
 
-                    ${market.description ? `<div style="color: #666; font-size: 0.9em; margin-bottom: 10px;">${market.description}</div>` : ''}
+                    ${market.description ? `<div style="color: #666; font-size: 0.9em; margin-bottom: 10px;">${escapeHtml(market.description)}</div>` : ''}
 
                     ${outcomes.length > 0 ? `
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                            ${outcomes.map(outcome => `
-                                <div style="background: white; padding: 8px 15px; border-radius: 5px; font-weight: 500;">
-                                    ${outcome}
-                                </div>
-                            `).join('')}
+                            ${outcomes.map(outcome => {
+                                const outcomeName = typeof outcome === 'string' ? outcome : (outcome.name || outcome.title || JSON.stringify(outcome));
+                                return `
+                                    <div style="background: white; padding: 8px 15px; border-radius: 5px; font-weight: 500;">
+                                        ${escapeHtml(outcomeName)}
+                                    </div>
+                                `;
+                            }).join('')}
                         </div>
                     ` : ''}
 
