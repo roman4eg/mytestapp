@@ -490,13 +490,41 @@
     </div>
 
     <script>
-        const API_BASE = 'https://gamma-api.polymarket.com';
+        // Визначаємо API base URL
+        // Якщо сторінка відкрита через HTTP сервер, використовуємо локальний проксі
+        // Інакше намагаємось звертатися напряму (може не працювати через CORS)
+        const isLocalServer = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+        const API_BASE = isLocalServer ? '/api' : 'https://gamma-api.polymarket.com';
+
         let currentPage = 0;
         let currentLimit = 12;
         let allEvents = [];
         let filteredEvents = [];
 
+        // Перевірка чи сторінка відкрита правильно
+        function checkServerStatus() {
+            if (!isLocalServer) {
+                showError('⚠️ УВАГА: Ви відкрили файл безпосередньо (file://). Це НЕ БУДЕ працювати через CORS обмеження браузера.\n\n' +
+                    'Будь ласка, запустіть локальний сервер:\n\n' +
+                    'Варіант 1 (Python):\n' +
+                    '  pip install -r requirements.txt\n' +
+                    '  python proxy-server.py\n\n' +
+                    'Варіант 2 (Node.js):\n' +
+                    '  npm install\n' +
+                    '  npm start\n\n' +
+                    'Потім відкрийте http://localhost:5000 у браузері.');
+                return false;
+            }
+            return true;
+        }
+
         async function loadEvents() {
+            // Перевірка чи сервер запущений
+            if (!checkServerStatus()) {
+                showLoading(false);
+                return;
+            }
+
             const statusFilter = document.getElementById('statusFilter').value;
             const sortOrder = document.getElementById('sortOrder').value;
             const limit = document.getElementById('limitSelect').value;
@@ -816,7 +844,7 @@
 
         function showError(message) {
             const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
+            errorDiv.innerHTML = message.replace(/\n/g, '<br>');
             errorDiv.style.display = 'block';
         }
 
