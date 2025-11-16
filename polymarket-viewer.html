@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymarket - Переглядач подій та ставок</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .controls label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .controls select,
+        .controls input {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .controls select:focus,
+        .controls input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c33;
+        }
+
+        .stats {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .events-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .event-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .event-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .event-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            background: #f0f0f0;
+        }
+
+        .event-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .event-description {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .event-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .meta-label {
+            color: #999;
+        }
+
+        .meta-value {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .market-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .market-count {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .markets-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .market-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .market-question {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .market-outcomes {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .outcome {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            font-size: 0.85em;
+        }
+
+        .outcome-name {
+            color: #666;
+        }
+
+        .outcome-price {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .tag {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-closed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .no-events {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .no-events-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            max-width: 800px;
+            margin: 40px auto;
+            border-radius: 15px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-image {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .events-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Polymarket Event Viewer</h1>
+            <p class="subtitle">Перегляд доступних подій та ставок на платформі Polymarket</p>
+        </header>
+
+        <div class="controls">
+            <label>
+                Статус:
+                <select id="statusFilter">
+                    <option value="active">Активні</option>
+                    <option value="all">Всі</option>
+                    <option value="closed">Закриті</option>
+                </select>
+            </label>
+
+            <label>
+                Сортування:
+                <select id="sortOrder">
+                    <option value="desc">Найновіші</option>
+                    <option value="asc">Найстаріші</option>
+                </select>
+            </label>
+
+            <label>
+                Кількість:
+                <select id="limitSelect">
+                    <option value="12">12</option>
+                    <option value="24">24</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
+
+            <button id="loadBtn" onclick="loadEvents()">Завантажити події</button>
+            <button id="refreshBtn" onclick="refreshEvents()">Оновити</button>
+        </div>
+
+        <div id="stats" class="stats" style="display: none;">
+            <div class="stat-item">
+                <div class="stat-value" id="totalEvents">0</div>
+                <div class="stat-label">Всього подій</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="totalMarkets">0</div>
+                <div class="stat-label">Всього ринків</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="activeEvents">0</div>
+                <div class="stat-label">Активні події</div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Завантаження подій...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="eventsContainer" class="events-grid"></div>
+
+        <div id="pagination" class="pagination" style="display: none;">
+            <button onclick="previousPage()" id="prevBtn">Попередня</button>
+            <span id="pageInfo"></span>
+            <button onclick="nextPage()" id="nextBtn">Наступна</button>
+        </div>
+    </div>
+
+    <div id="eventModal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://gamma-api.polymarket.com';
+        let currentPage = 0;
+        let currentLimit = 12;
+        let allEvents = [];
+        let filteredEvents = [];
+
+        async function loadEvents() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            const limit = document.getElementById('limitSelect').value;
+
+            currentLimit = parseInt(limit);
+            currentPage = 0;
+
+            showLoading(true);
+            hideError();
+
+            try {
+                let closed, active, archived;
+
+                if (statusFilter === 'active') {
+                    closed = false;
+                    active = true;
+                    archived = false;
+                } else if (statusFilter === 'closed') {
+                    closed = true;
+                    active = false;
+                    archived = false;
+                } else {
+                    closed = undefined;
+                    active = undefined;
+                    archived = false;
+                }
+
+                const params = new URLSearchParams({
+                    limit: limit,
+                    offset: 0,
+                    order: 'id',
+                    ascending: sortOrder === 'asc'
+                });
+
+                if (closed !== undefined) params.append('closed', closed);
+                if (active !== undefined) params.append('active', active);
+                if (archived !== undefined) params.append('archived', archived);
+
+                const response = await fetch(`${API_BASE}/events?${params}`);
+
+                if (!response.ok) {
+                    throw new Error(`Помилка API: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                allEvents = data || [];
+                filteredEvents = allEvents;
+
+                displayEvents();
+                updateStats();
+
+            } catch (error) {
+                showError(`Помилка завантаження: ${error.message}`);
+                console.error('Error:', error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayEvents() {
+            const container = document.getElementById('eventsContainer');
+
+            if (filteredEvents.length === 0) {
+                container.innerHTML = `
+                    <div class="no-events">
+                        <div class="no-events-icon">🔍</div>
+                        <h2>Події не знайдено</h2>
+                        <p>Спробуйте змінити фільтри або завантажити більше подій</p>
+                    </div>
+                `;
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+
+            const startIndex = currentPage * currentLimit;
+            const endIndex = Math.min(startIndex + currentLimit, filteredEvents.length);
+            const eventsToDisplay = filteredEvents.slice(startIndex, endIndex);
+
+            container.innerHTML = eventsToDisplay.map(event => createEventCard(event)).join('');
+            updatePagination();
+        }
+
+        function createEventCard(event) {
+            const markets = event.markets || [];
+            const activeCount = markets.filter(m => m.active).length;
+            const imageUrl = event.image || event.icon || '';
+            const tags = event.tags || [];
+
+            const statusClass = event.closed ? 'status-closed' : 'status-active';
+            const statusText = event.closed ? 'Закрито' : 'Активно';
+
+            return `
+                <div class="event-card" onclick="showEventDetails('${event.id}')">
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${event.title}" class="event-image" onerror="this.style.display='none'">` : ''}
+
+                    <div class="event-title">${event.title || 'Без назви'}</div>
+
+                    ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
+
+                    <div class="event-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Ринків:</span>
+                            <span class="meta-value">${markets.length}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Активних:</span>
+                            <span class="meta-value">${activeCount}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+
+                    ${tags.length > 0 ? `
+                        <div class="tags">
+                            ${tags.slice(0, 3).map(tag => `<span class="tag">${tag.label || tag}</span>`).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${markets.length > 0 ? `
+                        <div class="market-info">
+                            <div class="market-count">Доступні ринки:</div>
+                            <div class="markets-list">
+                                ${markets.slice(0, 3).map(market => createMarketPreview(market)).join('')}
+                                ${markets.length > 3 ? `<div style="text-align: center; color: #667eea; font-weight: 600;">+${markets.length - 3} ще...</div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function createMarketPreview(market) {
+            const outcomes = market.outcomes || [];
+            const groupItemTitle = market.groupItemTitle || market.question || 'Без питання';
+
+            return `
+                <div class="market-item">
+                    <div class="market-question">${groupItemTitle}</div>
+                    ${outcomes.length > 0 ? `
+                        <div class="market-outcomes">
+                            ${outcomes.map(outcome => `
+                                <div class="outcome">
+                                    <span class="outcome-name">${outcome}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function showEventDetails(eventId) {
+            const event = allEvents.find(e => e.id === eventId);
+            if (!event) return;
+
+            const modal = document.getElementById('eventModal');
+            const modalContent = document.getElementById('modalContent');
+
+            const markets = event.markets || [];
+            const tags = event.tags || [];
+            const imageUrl = event.image || event.icon || '';
+
+            modalContent.innerHTML = `
+                ${imageUrl ? `<img src="${imageUrl}" alt="${event.title}" class="modal-image" onerror="this.style.display='none'">` : ''}
+
+                <h2 style="color: #667eea; margin-bottom: 15px;">${event.title || 'Без назви'}</h2>
+
+                ${event.description ? `<p style="color: #666; line-height: 1.6; margin-bottom: 20px;">${event.description}</p>` : ''}
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div style="color: #999; font-size: 0.9em;">Статус</div>
+                        <div style="font-weight: 600; color: #333;">${event.closed ? 'Закрито' : 'Активно'}</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div style="color: #999; font-size: 0.9em;">Ринків</div>
+                        <div style="font-weight: 600; color: #667eea;">${markets.length}</div>
+                    </div>
+                    ${event.startDate ? `
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                            <div style="color: #999; font-size: 0.9em;">Дата початку</div>
+                            <div style="font-weight: 600; color: #333;">${new Date(event.startDate).toLocaleDateString('uk-UA')}</div>
+                        </div>
+                    ` : ''}
+                    ${event.endDate ? `
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                            <div style="color: #999; font-size: 0.9em;">Дата закінчення</div>
+                            <div style="font-weight: 600; color: #333;">${new Date(event.endDate).toLocaleDateString('uk-UA')}</div>
+                        </div>
+                    ` : ''}
+                </div>
+
+                ${tags.length > 0 ? `
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 10px;">Теги:</h3>
+                        <div class="tags">
+                            ${tags.map(tag => `<span class="tag">${tag.label || tag}</span>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${markets.length > 0 ? `
+                    <div>
+                        <h3 style="margin-bottom: 15px;">Всі ринки (${markets.length}):</h3>
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            ${markets.map(market => createMarketDetail(market)).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${event.slug ? `
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
+                        <a href="https://polymarket.com/event/${event.slug}" target="_blank"
+                           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                  color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none;
+                                  font-weight: 600; transition: transform 0.2s;"
+                           onmouseover="this.style.transform='translateY(-2px)'"
+                           onmouseout="this.style.transform='translateY(0)'">
+                            Переглянути на Polymarket ↗
+                        </a>
+                    </div>
+                ` : ''}
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        function createMarketDetail(market) {
+            const outcomes = market.outcomes || [];
+            const groupItemTitle = market.groupItemTitle || market.question || 'Без питання';
+
+            return `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #667eea;">
+                    <div style="font-weight: 600; color: #333; margin-bottom: 10px;">${groupItemTitle}</div>
+
+                    ${market.description ? `<div style="color: #666; font-size: 0.9em; margin-bottom: 10px;">${market.description}</div>` : ''}
+
+                    ${outcomes.length > 0 ? `
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                            ${outcomes.map(outcome => `
+                                <div style="background: white; padding: 8px 15px; border-radius: 5px; font-weight: 500;">
+                                    ${outcome}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    <div style="margin-top: 10px; font-size: 0.85em; color: #999;">
+                        Статус: ${market.active ? '✅ Активний' : '❌ Неактивний'}
+                        ${market.closed ? ' | Закритий' : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('eventModal').style.display = 'none';
+        }
+
+        function updateStats() {
+            const totalEvents = allEvents.length;
+            const activeEvents = allEvents.filter(e => !e.closed && e.active).length;
+            const totalMarkets = allEvents.reduce((sum, e) => sum + (e.markets?.length || 0), 0);
+
+            document.getElementById('totalEvents').textContent = totalEvents;
+            document.getElementById('activeEvents').textContent = activeEvents;
+            document.getElementById('totalMarkets').textContent = totalMarkets;
+            document.getElementById('stats').style.display = 'grid';
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredEvents.length / currentLimit);
+            const pageInfo = document.getElementById('pageInfo');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const pagination = document.getElementById('pagination');
+
+            if (totalPages <= 1) {
+                pagination.style.display = 'none';
+                return;
+            }
+
+            pagination.style.display = 'flex';
+            pageInfo.textContent = `Сторінка ${currentPage + 1} з ${totalPages}`;
+            prevBtn.disabled = currentPage === 0;
+            nextBtn.disabled = currentPage >= totalPages - 1;
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(filteredEvents.length / currentLimit);
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                displayEvents();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function previousPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                displayEvents();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function refreshEvents() {
+            loadEvents();
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('loadBtn').disabled = show;
+            document.getElementById('refreshBtn').disabled = show;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        // Автоматичне завантаження при відкритті сторінки
+        window.addEventListener('load', () => {
+            loadEvents();
+        });
+
+        // Закриття модального вікна при натисканні Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
