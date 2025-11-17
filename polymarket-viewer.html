@@ -679,7 +679,7 @@
     </div>
 
     <script>
-        // Version: 1.4.0 - Fixed filtering to load events with correct API filters
+        // Version: 1.5.0 - Improved price and order book display with outcome labels
         // Визначаємо API base URL
         // Якщо сторінка відкрита через HTTP сервер, використовуємо локальний проксі
         // Інакше намагаємось звертатися напряму (може не працювати через CORS)
@@ -740,15 +740,17 @@
         // Створити HTML для відображення ціни з progress bar
         function createPriceDisplay(outcomeName, probability) {
             const percentage = (probability * 100).toFixed(1);
+            // Ціна в центах (0-100)
+            const priceInCents = (probability * 100).toFixed(1);
             return `
                 <div class="price-indicator">
-                    <div style="min-width: 100px; font-weight: 500;">${escapeHtml(outcomeName)}:</div>
+                    <div style="min-width: 100px; font-weight: 600; color: #333;">${escapeHtml(outcomeName)}</div>
                     <div class="price-bar">
                         <div class="price-fill" style="width: ${percentage}%">
                             <span class="price-percentage">${percentage}%</span>
                         </div>
                     </div>
-                    <div class="price-value">$${probability.toFixed(3)}</div>
+                    <div class="price-value" style="font-weight: 600; color: #667eea;">${priceInCents}¢</div>
                 </div>
             `;
         }
@@ -806,33 +808,45 @@
             return `
                 <div class="orderbook">
                     <div class="orderbook-side orderbook-bids">
-                        <div class="orderbook-side-title">Купівля (Bids)</div>
+                        <div class="orderbook-side-title" style="display: flex; align-items: center; gap: 5px;">
+                            <span>📈 Купівля</span>
+                            <span style="font-size: 0.75em; font-weight: 400; color: #666;">(хочуть купити)</span>
+                        </div>
                         <div class="orderbook-header">
                             <div>Ціна</div>
-                            <div class="orderbook-header-size">Об'єм</div>
+                            <div class="orderbook-header-size">Кількість</div>
                         </div>
                         <div class="orderbook-rows">
-                            ${bids.length > 0 ? bids.map(bid => `
-                                <div class="orderbook-row">
-                                    <div class="orderbook-price">$${parseFloat(bid.price).toFixed(3)}</div>
-                                    <div class="orderbook-size">${parseFloat(bid.size).toFixed(0)}</div>
-                                </div>
-                            `).join('') : '<div style="padding: 10px; text-align: center; color: #999;">Немає ордерів</div>'}
+                            ${bids.length > 0 ? bids.map(bid => {
+                                const priceInCents = (parseFloat(bid.price) * 100).toFixed(1);
+                                return `
+                                    <div class="orderbook-row">
+                                        <div class="orderbook-price">${priceInCents}¢</div>
+                                        <div class="orderbook-size">${parseFloat(bid.size).toFixed(0)}</div>
+                                    </div>
+                                `;
+                            }).join('') : '<div style="padding: 10px; text-align: center; color: #999;">Немає ордерів</div>'}
                         </div>
                     </div>
                     <div class="orderbook-side orderbook-asks">
-                        <div class="orderbook-side-title">Продаж (Asks)</div>
+                        <div class="orderbook-side-title" style="display: flex; align-items: center; gap: 5px;">
+                            <span>📉 Продаж</span>
+                            <span style="font-size: 0.75em; font-weight: 400; color: #666;">(хочуть продати)</span>
+                        </div>
                         <div class="orderbook-header">
                             <div>Ціна</div>
-                            <div class="orderbook-header-size">Об'єм</div>
+                            <div class="orderbook-header-size">Кількість</div>
                         </div>
                         <div class="orderbook-rows">
-                            ${asks.length > 0 ? asks.map(ask => `
-                                <div class="orderbook-row">
-                                    <div class="orderbook-price">$${parseFloat(ask.price).toFixed(3)}</div>
-                                    <div class="orderbook-size">${parseFloat(ask.size).toFixed(0)}</div>
-                                </div>
-                            `).join('') : '<div style="padding: 10px; text-align: center; color: #999;">Немає ордерів</div>'}
+                            ${asks.length > 0 ? asks.map(ask => {
+                                const priceInCents = (parseFloat(ask.price) * 100).toFixed(1);
+                                return `
+                                    <div class="orderbook-row">
+                                        <div class="orderbook-price">${priceInCents}¢</div>
+                                        <div class="orderbook-size">${parseFloat(ask.size).toFixed(0)}</div>
+                                    </div>
+                                `;
+                            }).join('') : '<div style="padding: 10px; text-align: center; color: #999;">Немає ордерів</div>'}
                         </div>
                     </div>
                 </div>
@@ -1190,10 +1204,18 @@
             // Якщо є token IDs, показуємо ціни
             if (clobTokenIds.length > 0) {
                 html += `
-                    <div id="prices-${marketId}" style="margin-top: 15px;">
-                        <div class="loading-prices">⏳ Завантаження цін...</div>
+                    <div style="margin-top: 15px;">
+                        <div style="font-weight: 600; color: #667eea; margin-bottom: 10px; font-size: 0.95em;">
+                            💰 Поточні ціни
+                            <span style="font-weight: 400; color: #999; font-size: 0.85em; margin-left: 5px;">
+                                (1¢ = 1% ймовірності)
+                            </span>
+                        </div>
+                        <div id="prices-${marketId}">
+                            <div class="loading-prices">⏳ Завантаження цін...</div>
+                        </div>
                     </div>
-                    <div id="orderbook-${marketId}" style="margin-top: 10px;"></div>
+                    <div id="orderbook-${marketId}" style="margin-top: 15px;"></div>
                 `;
 
                 // Асинхронно завантажуємо ціни
@@ -1270,12 +1292,15 @@
                     return;
                 }
 
-                // Завантажуємо midpoint для кожного outcome
+                // Завантажуємо midpoint та order book для кожного outcome
                 const pricePromises = clobTokenIds.map(tokenId => loadMidpoint(tokenId));
+                const orderBookPromises = clobTokenIds.map(tokenId => loadOrderBook(tokenId));
+
                 const prices = await Promise.all(pricePromises);
+                const orderBooks = await Promise.all(orderBookPromises);
 
                 // Відображаємо ціни
-                let pricesHtml = '<div style="margin-bottom: 10px;">';
+                let pricesHtml = '<div style="margin-bottom: 15px;">';
                 prices.forEach((priceData, index) => {
                     if (priceData && priceData.mid) {
                         const outcomeName = outcomes[index] || `Outcome ${index + 1}`;
@@ -1287,22 +1312,25 @@
 
                 pricesContainer.innerHTML = pricesHtml;
 
-                // Завантажуємо order book для першого token (основний ринок)
-                if (clobTokenIds.length > 0) {
-                    const orderBook = await loadOrderBook(clobTokenIds[0]);
+                // Відображаємо стакани для кожного outcome
+                let orderbookHtml = '';
+                orderBooks.forEach((orderBook, index) => {
                     if (orderBook) {
+                        const outcomeName = outcomes[index] || `Outcome ${index + 1}`;
                         const liquidity = calculateLiquidity(orderBook);
-                        orderbookContainer.innerHTML = `
-                            <div class="orderbook-container">
+                        orderbookHtml += `
+                            <div class="orderbook-container" style="margin-bottom: 15px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <div class="orderbook-title">Стакан цін</div>
+                                    <div class="orderbook-title">Стакан: ${escapeHtml(outcomeName)}</div>
                                     ${createLiquidityIndicator(liquidity)}
                                 </div>
                                 ${createOrderBookDisplay(orderBook)}
                             </div>
                         `;
                     }
-                }
+                });
+
+                orderbookContainer.innerHTML = orderbookHtml;
 
             } catch (error) {
                 console.error('Error loading market prices:', error);
