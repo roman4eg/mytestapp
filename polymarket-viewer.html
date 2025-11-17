@@ -602,11 +602,19 @@
 <body>
     <div class="container">
         <header>
-            <h1>📊 Polymarket Event Viewer</h1>
-            <p class="subtitle">Перегляд доступних подій та ставок на платформі Polymarket</p>
+            <h1>📊 Prediction Markets Viewer</h1>
+            <p class="subtitle">Перегляд доступних подій та ставок на платформах прогнозування</p>
         </header>
 
         <div class="controls">
+            <label>
+                Платформа:
+                <select id="platformSelect" onchange="switchPlatform()">
+                    <option value="polymarket">Polymarket (Polygon)</option>
+                    <option value="opinion">Opinion (BNB Chain)</option>
+                </select>
+            </label>
+
             <label>
                 Статус:
                 <select id="statusFilter" onchange="loadEvents()">
@@ -679,17 +687,53 @@
     </div>
 
     <script>
-        // Version: 1.5.0 - Improved price and order book display with outcome labels
+        // Version: 2.0.0 - Multi-platform support: Polymarket + Opinion
         // Визначаємо API base URL
         // Якщо сторінка відкрита через HTTP сервер, використовуємо локальний проксі
         // Інакше намагаємось звертатися напряму (може не працювати через CORS)
         const isLocalServer = window.location.protocol === 'http:' || window.location.protocol === 'https:';
-        const API_BASE = isLocalServer ? '/api' : 'https://gamma-api.polymarket.com';
+
+        // Глобальна змінна для поточної платформи
+        let currentPlatform = 'polymarket';
+
+        // Функція для отримання API base URL в залежності від платформи
+        function getApiBase() {
+            if (currentPlatform === 'polymarket') {
+                return isLocalServer ? '/api' : 'https://gamma-api.polymarket.com';
+            } else if (currentPlatform === 'opinion') {
+                return isLocalServer ? '/api/opinion' : 'https://proxy.opinion.trade:8443';
+            }
+            return '/api';
+        }
 
         let currentPage = 0;
         let currentLimit = 12;
         let allEvents = [];
         let filteredEvents = [];
+
+        // Функція для перемикання платформ
+        function switchPlatform() {
+            const platformSelect = document.getElementById('platformSelect');
+            currentPlatform = platformSelect.value;
+
+            // Очистити дані
+            allEvents = [];
+            filteredEvents = [];
+
+            // Оновити UI
+            document.getElementById('eventsContainer').innerHTML = '';
+            document.getElementById('stats').style.display = 'none';
+
+            // Показати повідомлення про вибір платформи
+            showLoading(false);
+            document.getElementById('eventsContainer').innerHTML = `
+                <div class="no-events">
+                    <div class="no-events-icon">${currentPlatform === 'polymarket' ? '🟣' : '🟡'}</div>
+                    <h2>Платформа: ${currentPlatform === 'polymarket' ? 'Polymarket' : 'Opinion'}</h2>
+                    <p>Натисніть "Завантажити події" для отримання даних</p>
+                </div>
+            `;
+        }
 
         // Функція для екранування HTML спецсимволів
         function escapeHtml(text) {
@@ -704,7 +748,7 @@
         // Завантажити ціну для token
         async function loadPrice(tokenId, side = 'BUY') {
             try {
-                const response = await fetch(`${API_BASE}/price?token_id=${tokenId}&side=${side}`);
+                const response = await fetch(`${getApiBase()}/price?token_id=${tokenId}&side=${side}`);
                 if (!response.ok) throw new Error('Failed to fetch price');
                 return await response.json();
             } catch (error) {
@@ -716,7 +760,7 @@
         // Завантажити середню ціну (midpoint)
         async function loadMidpoint(tokenId) {
             try {
-                const response = await fetch(`${API_BASE}/midpoint?token_id=${tokenId}`);
+                const response = await fetch(`${getApiBase()}/midpoint?token_id=${tokenId}`);
                 if (!response.ok) throw new Error('Failed to fetch midpoint');
                 return await response.json();
             } catch (error) {
@@ -728,7 +772,7 @@
         // Завантажити order book
         async function loadOrderBook(tokenId) {
             try {
-                const response = await fetch(`${API_BASE}/book?token_id=${tokenId}`);
+                const response = await fetch(`${getApiBase()}/book?token_id=${tokenId}`);
                 if (!response.ok) throw new Error('Failed to fetch order book');
                 return await response.json();
             } catch (error) {
@@ -910,7 +954,7 @@
                 if (closed !== undefined) params.append('closed', closed);
                 if (active !== undefined) params.append('active', active);
 
-                const response = await fetch(`${API_BASE}/events?${params}`);
+                const response = await fetch(`${getApiBase()}/events?${params}`);
 
                 if (!response.ok) {
                     throw new Error(`Помилка API: ${response.status} ${response.statusText}`);

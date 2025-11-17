@@ -13,6 +13,7 @@ const app = express();
 const PORT = 5000;
 const POLYMARKET_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
+const OPINION_API = 'https://proxy.opinion.trade:8443';
 
 // Middleware
 app.use(cors());
@@ -139,12 +140,84 @@ app.get('/api/midpoint', async (req, res) => {
     }
 });
 
+// ===== Opinion API Endpoints =====
+
+// Проксі для Opinion /markets endpoint
+app.get('/api/opinion/events', async (req, res) => {
+    try {
+        const response = await axios.get(`${OPINION_API}/markets`, {
+            params: req.query,
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Opinion markets:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Проксі для Opinion /orderbook endpoint
+app.get('/api/opinion/book', async (req, res) => {
+    try {
+        const response = await axios.get(`${OPINION_API}/orderbook`, {
+            params: req.query,
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Opinion orderbook:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Проксі для Opinion /prices endpoint
+app.get('/api/opinion/midpoint', async (req, res) => {
+    try {
+        const response = await axios.get(`${OPINION_API}/prices`, {
+            params: req.query,
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Opinion prices:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
         polymarket_api: POLYMARKET_API,
         clob_api: CLOB_API,
+        opinion_api: OPINION_API,
         uptime: process.uptime()
     });
 });
@@ -152,11 +225,14 @@ app.get('/health', (req, res) => {
 // Запуск сервера
 app.listen(PORT, '0.0.0.0', () => {
     console.log('='.repeat(60));
-    console.log('🚀 Polymarket Event Viewer - Proxy Server (Node.js)');
+    console.log('🚀 Prediction Markets Viewer - Proxy Server (Node.js)');
     console.log('='.repeat(60));
     console.log(`📡 Proxy URL: http://localhost:${PORT}`);
     console.log(`🌐 Open in browser: http://localhost:${PORT}`);
     console.log(`❤️  Health check: http://localhost:${PORT}/health`);
+    console.log('='.repeat(60));
+    console.log(`🟣 Polymarket API: ${POLYMARKET_API}`);
+    console.log(`🟡 Opinion API: ${OPINION_API}`);
     console.log('='.repeat(60));
     console.log('\n⚠️  Make sure you have installed dependencies:');
     console.log('   npm install\n');

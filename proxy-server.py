@@ -14,6 +14,7 @@ CORS(app)  # Дозволяємо CORS для всіх маршрутів
 
 POLYMARKET_API = 'https://gamma-api.polymarket.com'
 CLOB_API = 'https://clob.polymarket.com'
+OPINION_API = 'https://proxy.opinion.trade:8443'
 
 @app.route('/')
 def index():
@@ -100,22 +101,73 @@ def get_midpoint():
         print(f"Unexpected error: {e}", file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
+# ===== Opinion API Endpoints =====
+
+@app.route('/api/opinion/events')
+def get_opinion_markets():
+    """Проксі для Opinion /markets endpoint"""
+    try:
+        params = request.args.to_dict()
+        response = requests.get(f'{OPINION_API}/markets', params=params, timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching Opinion markets: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/opinion/book')
+def get_opinion_orderbook():
+    """Проксі для Opinion /orderbook endpoint"""
+    try:
+        params = request.args.to_dict()
+        response = requests.get(f'{OPINION_API}/orderbook', params=params, timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching Opinion orderbook: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/opinion/midpoint')
+def get_opinion_price():
+    """Проксі для Opinion /prices endpoint"""
+    try:
+        params = request.args.to_dict()
+        response = requests.get(f'{OPINION_API}/prices', params=params, timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching Opinion prices: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/health')
 def health():
     """Перевірка здоров'я сервера"""
     return jsonify({
         'status': 'healthy',
         'polymarket_api': POLYMARKET_API,
-        'clob_api': CLOB_API
+        'clob_api': CLOB_API,
+        'opinion_api': OPINION_API
     })
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🚀 Polymarket Event Viewer - Proxy Server")
+    print("🚀 Prediction Markets Viewer - Proxy Server")
     print("=" * 60)
     print("📡 Proxy URL: http://localhost:5000")
     print("🌐 Open in browser: http://localhost:5000")
     print("❤️  Health check: http://localhost:5000/health")
+    print("=" * 60)
+    print("🟣 Polymarket API: " + POLYMARKET_API)
+    print("🟡 Opinion API: " + OPINION_API)
     print("=" * 60)
     print("\n⚠️  Make sure you have installed dependencies:")
     print("   pip install flask flask-cors requests\n")
