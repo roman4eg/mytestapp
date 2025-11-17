@@ -609,7 +609,7 @@
         <div class="controls">
             <label>
                 Статус:
-                <select id="statusFilter" onchange="applyFiltersAndSort()">
+                <select id="statusFilter" onchange="loadEvents()">
                     <option value="active">Активні</option>
                     <option value="all">Всі</option>
                     <option value="closed">Закриті</option>
@@ -643,15 +643,11 @@
         <div id="stats" class="stats" style="display: none;">
             <div class="stat-item">
                 <div class="stat-value" id="totalEvents">0</div>
-                <div class="stat-label">Всього подій</div>
+                <div class="stat-label">Завантажено подій</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="filteredEvents">0</div>
-                <div class="stat-label">Показано</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="activeEvents">0</div>
-                <div class="stat-label">Активні події</div>
+                <div class="stat-label">Після фільтрації</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="totalMarkets">0</div>
@@ -683,7 +679,7 @@
     </div>
 
     <script>
-        // Version: 1.3.0 - Client-side filtering and sorting, load all events
+        // Version: 1.4.0 - Fixed filtering to load events with correct API filters
         // Визначаємо API base URL
         // Якщо сторінка відкрита через HTTP сервер, використовуємо локальний проксі
         // Інакше намагаємось звертатися напряму (може не працювати через CORS)
@@ -872,8 +868,23 @@
             hideError();
 
             try {
-                // Завантажуємо ВСІ події без фільтрів (максимальний ліміт)
-                // Фільтрацію та сортування робимо на клієнті
+                const statusFilter = document.getElementById('statusFilter').value;
+
+                // Завантажуємо події в залежності від фільтру
+                let closed, active;
+
+                if (statusFilter === 'active') {
+                    closed = false;
+                    active = true;
+                } else if (statusFilter === 'closed') {
+                    closed = true;
+                    active = false;
+                } else {
+                    // Для "всі" завантажуємо без фільтрів
+                    closed = undefined;
+                    active = undefined;
+                }
+
                 const params = new URLSearchParams({
                     limit: 1000,  // Завантажуємо максимальну кількість
                     offset: 0,
@@ -881,6 +892,9 @@
                     ascending: false,
                     archived: false
                 });
+
+                if (closed !== undefined) params.append('closed', closed);
+                if (active !== undefined) params.append('active', active);
 
                 const response = await fetch(`${API_BASE}/events?${params}`);
 
@@ -891,7 +905,7 @@
                 const data = await response.json();
                 allEvents = data || [];
 
-                // Застосовуємо фільтри та сортування на клієнті
+                // Застосовуємо сортування на клієнті (фільтр вже застосований API)
                 applyFiltersAndSort();
 
             } catch (error) {
@@ -911,7 +925,7 @@
             currentLimit = parseInt(limit);
             currentPage = 0;
 
-            // Фільтрація
+            // Фільтрація (додаткова на клієнті, на випадок якщо потрібно)
             if (statusFilter === 'active') {
                 filteredEvents = allEvents.filter(event => !event.closed && event.active);
             } else if (statusFilter === 'closed') {
@@ -1303,13 +1317,11 @@
 
         function updateStats() {
             const totalEvents = allEvents.length;
-            const activeEvents = allEvents.filter(e => !e.closed && e.active).length;
             const totalMarkets = allEvents.reduce((sum, e) => sum + (e.markets?.length || 0), 0);
             const filtered = filteredEvents.length;
 
             document.getElementById('totalEvents').textContent = totalEvents;
             document.getElementById('filteredEvents').textContent = filtered;
-            document.getElementById('activeEvents').textContent = activeEvents;
             document.getElementById('totalMarkets').textContent = totalMarkets;
             document.getElementById('stats').style.display = 'grid';
         }
