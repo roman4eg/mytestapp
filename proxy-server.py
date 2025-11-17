@@ -14,6 +14,7 @@ CORS(app)  # Дозволяємо CORS для всіх маршрутів
 
 POLYMARKET_API = 'https://gamma-api.polymarket.com'
 CLOB_API = 'https://clob.polymarket.com'
+KALSHI_API = 'https://api.elections.kalshi.com/trade-api/v2'
 OPINION_API = 'https://proxy.opinion.trade:8443'
 
 @app.route('/')
@@ -101,6 +102,86 @@ def get_midpoint():
         print(f"Unexpected error: {e}", file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
+# ===== Kalshi API Endpoints =====
+
+@app.route('/api/kalshi/events')
+def get_kalshi_markets():
+    """Проксі для Kalshi /markets endpoint"""
+    try:
+        params = request.args.to_dict()
+        # Kalshi використовує параметр 'status' замість 'closed'/'active'
+        status_filter = request.args.get('status', '')
+
+        kalshi_params = {}
+        if 'limit' in params:
+            kalshi_params['limit'] = params['limit']
+        if status_filter:
+            kalshi_params['status'] = status_filter
+        elif 'active' in params and params.get('active') == 'true':
+            kalshi_params['status'] = 'open'
+        elif 'closed' in params and params.get('closed') == 'true':
+            kalshi_params['status'] = 'closed'
+
+        response = requests.get(f'{KALSHI_API}/markets', params=kalshi_params, timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching Kalshi markets: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/kalshi/book')
+def get_kalshi_orderbook():
+    """Проксі для Kalshi /markets/{ticker}/orderbook endpoint"""
+    try:
+        # token_id для Kalshi це ticker
+        ticker = request.args.get('token_id', '')
+        if not ticker:
+            return jsonify({'error': 'ticker required'}), 400
+
+        response = requests.get(f'{KALSHI_API}/markets/{ticker}/orderbook', timeout=30)
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching Kalshi orderbook: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/kalshi/midpoint')
+def get_kalshi_price():
+    """Проксі для Kalshi ціни (з orderbook)"""
+    try:
+        ticker = request.args.get('token_id', '')
+        if not ticker:
+            return jsonify({'error': 'ticker required'}), 400
+
+        # Kalshi не має окремого midpoint endpoint, беремо з orderbook
+        response = requests.get(f'{KALSHI_API}/markets/{ticker}/orderbook', timeout=30)
+        orderbook = response.json()
+
+        # Обчислюємо midpoint з yes orderbook
+        if 'orderbook' in orderbook and 'yes' in orderbook['orderbook']:
+            yes_book = orderbook['orderbook']['yes']
+            if yes_book:
+                # Беремо найкращі bid/ask для обчислення midpoint
+                best_bid = yes_book[0][0] if yes_book else 0
+                best_ask = yes_book[0][1] if yes_book else 100
+                mid = (best_bid + best_ask) / 200.0  # Конвертуємо в 0-1
+                return jsonify({'mid': str(mid)}), 200
+
+        return jsonify({'mid': '0.5'}), 200  # Default
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching Kalshi price: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
 # ===== Opinion API Endpoints =====
 
 @app.route('/api/opinion/events')
@@ -155,6 +236,7 @@ def health():
         'status': 'healthy',
         'polymarket_api': POLYMARKET_API,
         'clob_api': CLOB_API,
+        'kalshi_api': KALSHI_API,
         'opinion_api': OPINION_API
     })
 
@@ -167,6 +249,7 @@ if __name__ == '__main__':
     print("❤️  Health check: http://localhost:5000/health")
     print("=" * 60)
     print("🟣 Polymarket API: " + POLYMARKET_API)
+    print("🔵 Kalshi API: " + KALSHI_API)
     print("🟡 Opinion API: " + OPINION_API)
     print("=" * 60)
     print("\n⚠️  Make sure you have installed dependencies:")

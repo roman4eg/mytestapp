@@ -13,6 +13,7 @@ const app = express();
 const PORT = 5000;
 const POLYMARKET_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
+const KALSHI_API = 'https://api.elections.kalshi.com/trade-api/v2';
 const OPINION_API = 'https://proxy.opinion.trade:8443';
 
 // Middleware
@@ -140,6 +141,110 @@ app.get('/api/midpoint', async (req, res) => {
     }
 });
 
+// ===== Kalshi API Endpoints =====
+
+// Проксі для Kalshi /markets endpoint
+app.get('/api/kalshi/events', async (req, res) => {
+    try {
+        const params = req.query;
+        const kalshiParams = {};
+
+        // Kalshi використовує параметр 'status' замість 'closed'/'active'
+        if (params.limit) kalshiParams.limit = params.limit;
+        if (params.status) {
+            kalshiParams.status = params.status;
+        } else if (params.active === 'true') {
+            kalshiParams.status = 'open';
+        } else if (params.closed === 'true') {
+            kalshiParams.status = 'closed';
+        }
+
+        const response = await axios.get(`${KALSHI_API}/markets`, {
+            params: kalshiParams,
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Kalshi markets:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Проксі для Kalshi /markets/{ticker}/orderbook endpoint
+app.get('/api/kalshi/book', async (req, res) => {
+    try {
+        const ticker = req.query.token_id;
+        if (!ticker) {
+            return res.status(400).json({ error: 'ticker required' });
+        }
+
+        const response = await axios.get(`${KALSHI_API}/markets/${ticker}/orderbook`, {
+            timeout: 30000
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Kalshi orderbook:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Проксі для Kalshi ціни (з orderbook)
+app.get('/api/kalshi/midpoint', async (req, res) => {
+    try {
+        const ticker = req.query.token_id;
+        if (!ticker) {
+            return res.status(400).json({ error: 'ticker required' });
+        }
+
+        // Kalshi не має окремого midpoint endpoint, беремо з orderbook
+        const response = await axios.get(`${KALSHI_API}/markets/${ticker}/orderbook`, {
+            timeout: 30000
+        });
+
+        const orderbook = response.data;
+
+        // Обчислюємо midpoint з yes orderbook
+        if (orderbook.orderbook && orderbook.orderbook.yes && orderbook.orderbook.yes.length > 0) {
+            const yesBook = orderbook.orderbook.yes[0];
+            const bestBid = yesBook[0] || 0;
+            const bestAsk = yesBook[1] || 100;
+            const mid = (bestBid + bestAsk) / 200.0; // Конвертуємо в 0-1
+            res.json({ mid: mid.toString() });
+        } else {
+            res.json({ mid: '0.5' }); // Default
+        }
+    } catch (error) {
+        console.error('Error fetching Kalshi price:', error.message);
+
+        if (error.response) {
+            res.status(error.response.status).json({
+                error: error.message,
+                details: error.response.data
+            });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
 // ===== Opinion API Endpoints =====
 
 // Проксі для Opinion /markets endpoint
@@ -217,6 +322,7 @@ app.get('/health', (req, res) => {
         status: 'healthy',
         polymarket_api: POLYMARKET_API,
         clob_api: CLOB_API,
+        kalshi_api: KALSHI_API,
         opinion_api: OPINION_API,
         uptime: process.uptime()
     });
@@ -232,6 +338,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`❤️  Health check: http://localhost:${PORT}/health`);
     console.log('='.repeat(60));
     console.log(`🟣 Polymarket API: ${POLYMARKET_API}`);
+    console.log(`🔵 Kalshi API: ${KALSHI_API}`);
     console.log(`🟡 Opinion API: ${OPINION_API}`);
     console.log('='.repeat(60));
     console.log('\n⚠️  Make sure you have installed dependencies:');

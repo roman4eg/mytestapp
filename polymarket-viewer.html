@@ -611,6 +611,7 @@
                 Платформа:
                 <select id="platformSelect" onchange="switchPlatform()">
                     <option value="polymarket">Polymarket (Polygon)</option>
+                    <option value="kalshi">Kalshi (USA Legal)</option>
                     <option value="opinion">Opinion (BNB Chain)</option>
                 </select>
             </label>
@@ -687,7 +688,7 @@
     </div>
 
     <script>
-        // Version: 2.0.0 - Multi-platform support: Polymarket + Opinion
+        // Version: 2.1.0 - Added Kalshi support (requires API key)
         // Визначаємо API base URL
         // Якщо сторінка відкрита через HTTP сервер, використовуємо локальний проксі
         // Інакше намагаємось звертатися напряму (може не працювати через CORS)
@@ -700,6 +701,8 @@
         function getApiBase() {
             if (currentPlatform === 'polymarket') {
                 return isLocalServer ? '/api' : 'https://gamma-api.polymarket.com';
+            } else if (currentPlatform === 'kalshi') {
+                return isLocalServer ? '/api/kalshi' : 'https://api.elections.kalshi.com/trade-api/v2';
             } else if (currentPlatform === 'opinion') {
                 return isLocalServer ? '/api/opinion' : 'https://proxy.opinion.trade:8443';
             }
@@ -726,10 +729,20 @@
 
             // Показати повідомлення про вибір платформи
             showLoading(false);
+            const platformIcons = {
+                'polymarket': '🟣',
+                'kalshi': '🔵',
+                'opinion': '🟡'
+            };
+            const platformNames = {
+                'polymarket': 'Polymarket',
+                'kalshi': 'Kalshi',
+                'opinion': 'Opinion'
+            };
             document.getElementById('eventsContainer').innerHTML = `
                 <div class="no-events">
-                    <div class="no-events-icon">${currentPlatform === 'polymarket' ? '🟣' : '🟡'}</div>
-                    <h2>Платформа: ${currentPlatform === 'polymarket' ? 'Polymarket' : 'Opinion'}</h2>
+                    <div class="no-events-icon">${platformIcons[currentPlatform] || '📊'}</div>
+                    <h2>Платформа: ${platformNames[currentPlatform] || currentPlatform}</h2>
                     <p>Натисніть "Завантажити події" для отримання даних</p>
                 </div>
             `;
