@@ -609,7 +609,7 @@
         <div class="controls">
             <label>
                 Статус:
-                <select id="statusFilter">
+                <select id="statusFilter" onchange="applyFiltersAndSort()">
                     <option value="active">Активні</option>
                     <option value="all">Всі</option>
                     <option value="closed">Закриті</option>
@@ -618,19 +618,21 @@
 
             <label>
                 Сортування:
-                <select id="sortOrder">
+                <select id="sortOrder" onchange="applyFiltersAndSort()">
                     <option value="desc">Найновіші</option>
                     <option value="asc">Найстаріші</option>
                 </select>
             </label>
 
             <label>
-                Кількість:
-                <select id="limitSelect">
+                Подій на сторінці:
+                <select id="limitSelect" onchange="applyFiltersAndSort()">
                     <option value="12">12</option>
                     <option value="24">24</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="500">500</option>
                 </select>
             </label>
 
@@ -644,12 +646,16 @@
                 <div class="stat-label">Всього подій</div>
             </div>
             <div class="stat-item">
-                <div class="stat-value" id="totalMarkets">0</div>
-                <div class="stat-label">Всього ринків</div>
+                <div class="stat-value" id="filteredEvents">0</div>
+                <div class="stat-label">Показано</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="activeEvents">0</div>
                 <div class="stat-label">Активні події</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="totalMarkets">0</div>
+                <div class="stat-label">Всього ринків</div>
             </div>
         </div>
 
@@ -677,7 +683,7 @@
     </div>
 
     <script>
-        // Version: 1.2.0 - Fixed JSON string parsing for clobTokenIds and outcomes
+        // Version: 1.3.0 - Client-side filtering and sorting, load all events
         // Визначаємо API base URL
         // Якщо сторінка відкрита через HTTP сервер, використовуємо локальний проксі
         // Інакше намагаємось звертатися напряму (може не працювати через CORS)
@@ -861,43 +867,20 @@
                 return;
             }
 
-            const statusFilter = document.getElementById('statusFilter').value;
-            const sortOrder = document.getElementById('sortOrder').value;
-            const limit = document.getElementById('limitSelect').value;
-
-            currentLimit = parseInt(limit);
             currentPage = 0;
-
             showLoading(true);
             hideError();
 
             try {
-                let closed, active, archived;
-
-                if (statusFilter === 'active') {
-                    closed = false;
-                    active = true;
-                    archived = false;
-                } else if (statusFilter === 'closed') {
-                    closed = true;
-                    active = false;
-                    archived = false;
-                } else {
-                    closed = undefined;
-                    active = undefined;
-                    archived = false;
-                }
-
+                // Завантажуємо ВСІ події без фільтрів (максимальний ліміт)
+                // Фільтрацію та сортування робимо на клієнті
                 const params = new URLSearchParams({
-                    limit: limit,
+                    limit: 1000,  // Завантажуємо максимальну кількість
                     offset: 0,
                     order: 'id',
-                    ascending: sortOrder === 'asc'
+                    ascending: false,
+                    archived: false
                 });
-
-                if (closed !== undefined) params.append('closed', closed);
-                if (active !== undefined) params.append('active', active);
-                if (archived !== undefined) params.append('archived', archived);
 
                 const response = await fetch(`${API_BASE}/events?${params}`);
 
@@ -907,10 +890,9 @@
 
                 const data = await response.json();
                 allEvents = data || [];
-                filteredEvents = allEvents;
 
-                displayEvents();
-                updateStats();
+                // Застосовуємо фільтри та сортування на клієнті
+                applyFiltersAndSort();
 
             } catch (error) {
                 showError(`Помилка завантаження: ${error.message}`);
@@ -918,6 +900,40 @@
             } finally {
                 showLoading(false);
             }
+        }
+
+        // Застосувати фільтри та сортування на клієнті
+        function applyFiltersAndSort() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            const limit = document.getElementById('limitSelect').value;
+
+            currentLimit = parseInt(limit);
+            currentPage = 0;
+
+            // Фільтрація
+            if (statusFilter === 'active') {
+                filteredEvents = allEvents.filter(event => !event.closed && event.active);
+            } else if (statusFilter === 'closed') {
+                filteredEvents = allEvents.filter(event => event.closed);
+            } else {
+                filteredEvents = [...allEvents]; // Всі події
+            }
+
+            // Сортування за датою створення або ID
+            filteredEvents.sort((a, b) => {
+                const idA = parseInt(a.id) || 0;
+                const idB = parseInt(b.id) || 0;
+
+                if (sortOrder === 'asc') {
+                    return idA - idB; // Найстаріші спочатку
+                } else {
+                    return idB - idA; // Найновіші спочатку
+                }
+            });
+
+            displayEvents();
+            updateStats();
         }
 
         function displayEvents() {
@@ -1289,8 +1305,10 @@
             const totalEvents = allEvents.length;
             const activeEvents = allEvents.filter(e => !e.closed && e.active).length;
             const totalMarkets = allEvents.reduce((sum, e) => sum + (e.markets?.length || 0), 0);
+            const filtered = filteredEvents.length;
 
             document.getElementById('totalEvents').textContent = totalEvents;
+            document.getElementById('filteredEvents').textContent = filtered;
             document.getElementById('activeEvents').textContent = activeEvents;
             document.getElementById('totalMarkets').textContent = totalMarkets;
             document.getElementById('stats').style.display = 'grid';
