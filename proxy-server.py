@@ -266,8 +266,9 @@ def get_opinion_markets():
         # Debug: Print first topic to understand structure (only once)
         if all_events:
             import json
-            print(f"DEBUG - First topic structure:", file=sys.stderr)
-            print(json.dumps(all_events[0], indent=2, ensure_ascii=False)[:1000], file=sys.stderr)
+            print(f"DEBUG - First topic FULL structure:", file=sys.stderr)
+            # Print full structure without truncation to see all fields
+            print(json.dumps(all_events[0], indent=2, ensure_ascii=False), file=sys.stderr)
 
         events_list = all_events
 
