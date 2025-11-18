@@ -197,59 +197,56 @@ def get_kalshi_price():
 def get_opinion_markets():
     """Проксі для Opinion /markets endpoint"""
     try:
-        # Opinion API doesn't use the same parameters as Polymarket
-        # For now, just get all markets without filters
-        # TODO: Map Polymarket parameters to Opinion parameters once we know the API structure
-
         if not OPINION_API_KEY:
             print("⚠️ WARNING: OPINION_API_KEY not found in environment!", file=sys.stderr)
             return jsonify({'error': 'API key not configured'}), 500
 
-        print(f"API Key loaded: {OPINION_API_KEY[:10]}... (length: {len(OPINION_API_KEY)})", file=sys.stderr)
+        # Opinion API uses X-API-Key header (discovered through testing)
+        headers = {'X-API-Key': OPINION_API_KEY}
 
-        # Try different possible endpoints based on browser network logs
-        possible_endpoints = [
-            f'{OPINION_API}/api/bsc/api/v2/topic',
-            f'{OPINION_API}/api/bsc/api/v2/markets',
-            f'{OPINION_API}/api/bsc/api/v2/topics',
-            f'{OPINION_API}/api/bsc/markets',
-        ]
+        # Endpoint structure: /api/bsc/api/v2/topic
+        endpoint = f'{OPINION_API}/api/bsc/api/v2/topic'
 
-        # Try different authentication header formats
-        auth_variants = [
-            {'X-API-Key': OPINION_API_KEY},                     # Common API key header
-            {'Authorization': OPINION_API_KEY},                 # Without Bearer
-            {'Authorization': f'Bearer {OPINION_API_KEY}'},     # With Bearer (standard)
-            {'apikey': OPINION_API_KEY},                        # Simple apikey header
-            {'x-api-key': OPINION_API_KEY},                     # Lowercase variant
-            {'Api-Key': OPINION_API_KEY},                       # Another common variant
-        ]
+        response = requests.get(endpoint, headers=headers, timeout=30)
 
-        last_error = None
-        for endpoint in possible_endpoints:
-            for idx, headers in enumerate(auth_variants):
-                try:
-                    auth_method = list(headers.keys())[0]
-                    print(f"Trying endpoint: {endpoint} with {auth_method} header", file=sys.stderr)
-                    response = requests.get(endpoint, headers=headers, timeout=10)
-                    print(f"Status: {response.status_code}, Preview: {str(response.text)[:200]}", file=sys.stderr)
+        if response.status_code != 200:
+            print(f"Opinion API error: {response.status_code} - {response.text[:200]}", file=sys.stderr)
+            return jsonify({'error': f'Opinion API returned {response.status_code}'}), response.status_code
 
-                    if response.status_code == 200:
-                        print(f"✓ SUCCESS! Working endpoint: {endpoint} with {auth_method} header", file=sys.stderr)
-                        return jsonify(response.json()), response.status_code
-                    elif response.status_code == 401:
-                        # 401 means endpoint exists but auth is wrong, continue to next auth method
-                        continue
+        data = response.json()
 
-                except Exception as e:
-                    print(f"Failed: {str(e)[:100]}", file=sys.stderr)
-                    last_error = e
-                    continue
+        # Opinion API returns: {"errno": 0, "errmsg": "", "result": {"list": [...]}}
+        # Extract the list from the nested structure
+        if 'result' in data and 'list' in data['result']:
+            events_list = data['result']['list']
+            print(f"✓ Opinion API: Retrieved {len(events_list)} topics", file=sys.stderr)
 
-        # If no endpoint worked, return the last error
-        if last_error:
-            raise last_error
-        return jsonify({'error': 'No working endpoint found - tried all authentication methods'}), 404
+            # Transform Opinion format to match Polymarket structure
+            transformed_events = []
+            for topic in events_list:
+                # Map Opinion fields to Polymarket-like structure
+                transformed = {
+                    'id': str(topic.get('topicId', '')),
+                    'title': topic.get('title', ''),
+                    'description': topic.get('abstract', '') or topic.get('content', ''),
+                    'active': topic.get('status', 0) == 1,  # Assuming status 1 = active
+                    'closed': topic.get('status', 0) != 1,
+                    'created': topic.get('createTime', 0),
+                    'end_date': topic.get('endTime', 0),
+                    'image': topic.get('coverUrl', ''),
+                    'volume': topic.get('volume', 0),
+                    'liquidity': 0,  # Opinion might not have this field
+                    'markets': [],  # Will need to fetch separately if needed
+                    'outcomes': [],  # Will need to map from Opinion's market structure
+                    'platform': 'opinion',
+                    '_raw': topic  # Keep raw data for debugging
+                }
+                transformed_events.append(transformed)
+
+            return jsonify(transformed_events), 200
+        else:
+            print(f"Unexpected Opinion API response structure: {str(data)[:200]}", file=sys.stderr)
+            return jsonify({'error': 'Unexpected API response structure'}), 500
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Opinion markets: {e}", file=sys.stderr)
