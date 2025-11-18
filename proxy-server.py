@@ -208,7 +208,21 @@ def get_opinion_markets():
         # Endpoint structure: /api/bsc/api/v2/topic
         endpoint = f'{OPINION_API}/api/bsc/api/v2/topic'
 
-        response = requests.get(endpoint, headers=headers, timeout=30)
+        # Get pagination parameters from request
+        limit = request.args.get('limit', '1000')
+
+        # Try different pagination parameter names that Opinion API might use
+        params = {
+            'pageSize': limit,      # Common pagination param
+            'limit': limit,         # Alternative
+            'size': limit,          # Another alternative
+            'page': '1',           # Start from first page
+            'pageNum': '1',        # Alternative page param
+        }
+
+        print(f"Requesting Opinion API with params: {params}", file=sys.stderr)
+
+        response = requests.get(endpoint, headers=headers, params=params, timeout=30)
 
         if response.status_code != 200:
             print(f"Opinion API error: {response.status_code} - {response.text[:200]}", file=sys.stderr)
