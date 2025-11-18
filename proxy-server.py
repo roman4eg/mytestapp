@@ -197,18 +197,27 @@ def get_kalshi_price():
 def get_opinion_markets():
     """Проксі для Opinion /markets endpoint"""
     try:
-        params = request.args.to_dict()
+        # Opinion API doesn't use the same parameters as Polymarket
+        # For now, just get all markets without filters
+        # TODO: Map Polymarket parameters to Opinion parameters once we know the API structure
 
         # Add Authorization header if API key is available
         headers = {}
         if OPINION_API_KEY:
             headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
 
-        response = requests.get(f'{OPINION_API}/markets', params=params, headers=headers, timeout=30)
+        # Don't pass any parameters for now to see what Opinion API returns
+        response = requests.get(f'{OPINION_API}/markets', headers=headers, timeout=30)
+
+        print(f"Opinion API response status: {response.status_code}", file=sys.stderr)
+        print(f"Opinion API response preview: {str(response.text)[:500]}", file=sys.stderr)
+
         return jsonify(response.json()), response.status_code
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Opinion markets: {e}", file=sys.stderr)
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Response text: {e.response.text}", file=sys.stderr)
         return jsonify({'error': str(e)}), 500
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
