@@ -209,38 +209,67 @@ def get_opinion_markets():
         endpoint = f'{OPINION_API}/api/bsc/api/v2/topic'
 
         # Get pagination parameters from request
-        limit = request.args.get('limit', '1000')
+        requested_limit = int(request.args.get('limit', '1000'))
 
-        # Try different pagination parameter names that Opinion API might use
-        params = {
-            'pageSize': limit,      # Common pagination param
-            'limit': limit,         # Alternative
-            'size': limit,          # Another alternative
-            'page': '1',           # Start from first page
-            'pageNum': '1',        # Alternative page param
-        }
+        # Opinion API seems to have max 20 items per page, so we need to fetch multiple pages
+        all_events = []
+        page = 1
+        max_pages = 50  # Safety limit to avoid infinite loop (50 pages * 20 = 1000 items max)
 
-        print(f"Requesting Opinion API with params: {params}", file=sys.stderr)
+        while len(all_events) < requested_limit and page <= max_pages:
+            # Try different pagination parameter names
+            params = {
+                'pageSize': '100',      # Try requesting more
+                'limit': '100',         # Alternative
+                'size': '100',          # Another alternative
+                'page': str(page),      # Current page
+                'pageNum': str(page),   # Alternative page param
+            }
 
-        response = requests.get(endpoint, headers=headers, params=params, timeout=30)
+            print(f"Fetching page {page} from Opinion API...", file=sys.stderr)
 
-        if response.status_code != 200:
-            print(f"Opinion API error: {response.status_code} - {response.text[:200]}", file=sys.stderr)
-            return jsonify({'error': f'Opinion API returned {response.status_code}'}), response.status_code
+            response = requests.get(endpoint, headers=headers, params=params, timeout=30)
 
-        data = response.json()
+            if response.status_code != 200:
+                print(f"Opinion API error: {response.status_code} - {response.text[:200]}", file=sys.stderr)
+                if page == 1:
+                    return jsonify({'error': f'Opinion API returned {response.status_code}'}), response.status_code
+                else:
+                    break  # Stop if we get error on subsequent pages
 
-        # Opinion API returns: {"errno": 0, "errmsg": "", "result": {"list": [...]}}
-        # Extract the list from the nested structure
-        if 'result' in data and 'list' in data['result']:
-            events_list = data['result']['list']
-            print(f"✓ Opinion API: Retrieved {len(events_list)} topics", file=sys.stderr)
+            data = response.json()
 
-            # Debug: Print first topic to understand structure
-            if events_list:
-                import json
-                print(f"DEBUG - First topic structure:", file=sys.stderr)
-                print(json.dumps(events_list[0], indent=2, ensure_ascii=False)[:1000], file=sys.stderr)
+            # Opinion API returns: {"errno": 0, "errmsg": "", "result": {"list": [...]}}
+            # Extract the list from the nested structure
+            if 'result' in data and 'list' in data['result']:
+                events_list = data['result']['list']
+
+                if not events_list:
+                    print(f"Page {page} returned no results, stopping pagination", file=sys.stderr)
+                    break
+
+                print(f"  ✓ Page {page}: Retrieved {len(events_list)} topics", file=sys.stderr)
+                all_events.extend(events_list)
+
+                # If we got less than expected, probably reached the end
+                if len(events_list) < 20:
+                    print(f"Got {len(events_list)} < 20 items, reached last page", file=sys.stderr)
+                    break
+
+                page += 1
+            else:
+                print(f"Unexpected API response structure on page {page}", file=sys.stderr)
+                break
+
+        print(f"✓ Opinion API: Total retrieved {len(all_events)} topics across {page} pages", file=sys.stderr)
+
+        # Debug: Print first topic to understand structure (only once)
+        if all_events:
+            import json
+            print(f"DEBUG - First topic structure:", file=sys.stderr)
+            print(json.dumps(all_events[0], indent=2, ensure_ascii=False)[:1000], file=sys.stderr)
+
+        events_list = all_events
 
             # Transform Opinion format to match Polymarket structure
             transformed_events = []
