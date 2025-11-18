@@ -27,6 +27,11 @@ OPINION_API = 'https://proxy.opinion.trade:8443'
 OPINION_API_KEY = os.getenv('OPINION_API_KEY', '')
 KALSHI_API_KEY = os.getenv('KALSHI_API_KEY', '')
 
+# Simple in-memory cache for Opinion topics (to avoid re-fetching for prices/orderbook)
+opinion_topics_cache = {}
+opinion_cache_timestamp = 0
+OPINION_CACHE_TTL = 60  # Cache for 60 seconds
+
 @app.route('/')
 def index():
     """Головна сторінка - відкриває polymarket-viewer.html"""
@@ -354,6 +359,18 @@ def get_opinion_markets():
             }
             transformed_events.append(transformed)
 
+            # Cache topic data for later use (for midpoint/orderbook requests)
+            global opinion_topics_cache, opinion_cache_timestamp
+            opinion_topics_cache[str(topic_id)] = {
+                'yes_price': yes_price,
+                'no_price': no_price,
+                'yes_buy': float(topic.get('yesBuyPrice', 0) or 0),
+                'yes_sell': float(topic.get('yesSellPrice', 0) or 0),
+                'no_buy': float(topic.get('noBuyPrice', 0) or 0),
+                'no_sell': float(topic.get('noSellPrice', 0) or 0),
+            }
+
+        opinion_cache_timestamp = int(time.time())
         return jsonify(transformed_events), 200
 
     except requests.exceptions.RequestException as e:
@@ -369,42 +386,103 @@ def get_opinion_markets():
 def get_opinion_orderbook():
     """Проксі для Opinion /orderbook endpoint"""
     try:
-        params = request.args.to_dict()
+        token_id = request.args.get('token_id', '')
 
-        # Add Authorization header if API key is available
-        headers = {}
-        if OPINION_API_KEY:
-            headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
+        if not token_id:
+            return jsonify({'error': 'token_id required'}), 400
 
-        response = requests.get(f'{OPINION_API}/orderbook', params=params, headers=headers, timeout=30)
-        return jsonify(response.json()), response.status_code
+        # Extract topic_id and side from synthetic token_id (e.g., "yes_1820" or "no_1820")
+        parts = token_id.split('_')
+        if len(parts) != 2:
+            return jsonify({'error': 'Invalid token_id format'}), 400
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching Opinion orderbook: {e}", file=sys.stderr)
-        return jsonify({'error': str(e)}), 500
+        side = parts[0]  # "yes" or "no"
+        topic_id = parts[1]
+
+        # Check cache
+        global opinion_topics_cache, opinion_cache_timestamp
+        current_time = int(time.time())
+
+        # If cache is stale or empty, return empty orderbook
+        if not opinion_topics_cache or (current_time - opinion_cache_timestamp) > OPINION_CACHE_TTL:
+            return jsonify({'bids': [], 'asks': []}), 200
+
+        # Get cached topic data
+        if topic_id not in opinion_topics_cache:
+            return jsonify({'bids': [], 'asks': []}), 200
+
+        topic_data = opinion_topics_cache[topic_id]
+
+        # Create simplified orderbook from buy/sell prices
+        # In Opinion, buy price = bid, sell price = ask
+        if side == 'yes':
+            buy_price = topic_data['yes_buy']
+            sell_price = topic_data['yes_sell']
+        elif side == 'no':
+            buy_price = topic_data['no_buy']
+            sell_price = topic_data['no_sell']
+        else:
+            return jsonify({'error': 'Invalid side'}), 400
+
+        # Create orderbook structure
+        # Note: Opinion doesn't provide full orderbook depth, only top prices
+        orderbook = {
+            'bids': [{'price': str(buy_price), 'size': '1000'}] if buy_price > 0 else [],
+            'asks': [{'price': str(sell_price), 'size': '1000'}] if sell_price > 0 else []
+        }
+
+        return jsonify(orderbook), 200
+
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        print(f"Error fetching Opinion orderbook: {e}", file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/opinion/midpoint')
 def get_opinion_price():
-    """Проксі для Opinion /prices endpoint"""
+    """Проксі для Opinion /midpoint endpoint - returns current price"""
     try:
-        params = request.args.to_dict()
+        token_id = request.args.get('token_id', '')
 
-        # Add Authorization header if API key is available
-        headers = {}
-        if OPINION_API_KEY:
-            headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
+        if not token_id:
+            return jsonify({'error': 'token_id required'}), 400
 
-        response = requests.get(f'{OPINION_API}/prices', params=params, headers=headers, timeout=30)
-        return jsonify(response.json()), response.status_code
+        # Extract topic_id and side from synthetic token_id (e.g., "yes_1820" or "no_1820")
+        parts = token_id.split('_')
+        if len(parts) != 2:
+            return jsonify({'error': 'Invalid token_id format'}), 400
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching Opinion prices: {e}", file=sys.stderr)
-        return jsonify({'error': str(e)}), 500
+        side = parts[0]  # "yes" or "no"
+        topic_id = parts[1]
+
+        # Check cache first
+        global opinion_topics_cache, opinion_cache_timestamp
+        current_time = int(time.time())
+
+        # If cache is stale or empty, return default
+        if not opinion_topics_cache or (current_time - opinion_cache_timestamp) > OPINION_CACHE_TTL:
+            print(f"Opinion cache is stale or empty, returning default price", file=sys.stderr)
+            return jsonify({'mid': '0.5'}), 200
+
+        # Get cached topic data
+        if topic_id not in opinion_topics_cache:
+            print(f"Topic {topic_id} not found in cache", file=sys.stderr)
+            return jsonify({'mid': '0.5'}), 200
+
+        topic_data = opinion_topics_cache[topic_id]
+
+        # Return price based on side
+        if side == 'yes':
+            price = topic_data['yes_price']
+        elif side == 'no':
+            price = topic_data['no_price']
+        else:
+            return jsonify({'error': 'Invalid side'}), 400
+
+        # Return in Polymarket format
+        return jsonify({'mid': str(price)}), 200
+
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        print(f"Error fetching Opinion midpoint: {e}", file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/health')
