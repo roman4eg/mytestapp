@@ -9,6 +9,7 @@ from flask_cors import CORS
 import requests
 import sys
 import os
+import time
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -221,18 +222,34 @@ def get_opinion_markets():
             events_list = data['result']['list']
             print(f"✓ Opinion API: Retrieved {len(events_list)} topics", file=sys.stderr)
 
+            # Debug: Print first topic to understand structure
+            if events_list:
+                import json
+                print(f"DEBUG - First topic structure:", file=sys.stderr)
+                print(json.dumps(events_list[0], indent=2, ensure_ascii=False)[:1000], file=sys.stderr)
+
             # Transform Opinion format to match Polymarket structure
             transformed_events = []
             for topic in events_list:
+                # Debug each topic's status
+                status = topic.get('status', None)
+                end_time = topic.get('endTime', 0)
+                current_time = int(time.time())
+
+                print(f"Topic {topic.get('topicId', 'unknown')}: status={status}, endTime={end_time}, current={current_time}", file=sys.stderr)
+
+                # Determine if active based on endTime (if endTime is in the future, it's active)
+                is_active = end_time > current_time if end_time else (status == 1)
+
                 # Map Opinion fields to Polymarket-like structure
                 transformed = {
                     'id': str(topic.get('topicId', '')),
                     'title': topic.get('title', ''),
                     'description': topic.get('abstract', '') or topic.get('content', ''),
-                    'active': topic.get('status', 0) == 1,  # Assuming status 1 = active
-                    'closed': topic.get('status', 0) != 1,
+                    'active': is_active,
+                    'closed': not is_active,
                     'created': topic.get('createTime', 0),
-                    'end_date': topic.get('endTime', 0),
+                    'end_date': end_time,
                     'image': topic.get('coverUrl', ''),
                     'volume': topic.get('volume', 0),
                     'liquidity': 0,  # Opinion might not have this field
