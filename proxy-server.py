@@ -205,6 +205,9 @@ def get_opinion_markets():
         headers = {}
         if OPINION_API_KEY:
             headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
+            print(f"API Key loaded: {OPINION_API_KEY[:10]}... (length: {len(OPINION_API_KEY)})", file=sys.stderr)
+        else:
+            print("⚠️ WARNING: OPINION_API_KEY not found in environment!", file=sys.stderr)
 
         # Try different possible endpoints based on browser network logs
         possible_endpoints = [
