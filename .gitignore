@@ -40,3 +40,6 @@ logs/
 *.pid
 server.pid
 server.log
+
+# Environment variables
+.env

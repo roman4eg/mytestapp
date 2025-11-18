@@ -4,6 +4,8 @@
  * Простий Express сервер для проксування запитів до Polymarket API з підтримкою CORS
  */
 
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -15,6 +17,10 @@ const POLYMARKET_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
 const KALSHI_API = 'https://api.elections.kalshi.com/trade-api/v2';
 const OPINION_API = 'https://proxy.opinion.trade:8443';
+
+// API Keys from environment variables
+const OPINION_API_KEY = process.env.OPINION_API_KEY || '';
+const KALSHI_API_KEY = process.env.KALSHI_API_KEY || '';
 
 // Middleware
 app.use(cors());
@@ -250,8 +256,15 @@ app.get('/api/kalshi/midpoint', async (req, res) => {
 // Проксі для Opinion /markets endpoint
 app.get('/api/opinion/events', async (req, res) => {
     try {
+        // Add Authorization header if API key is available
+        const headers = {};
+        if (OPINION_API_KEY) {
+            headers['Authorization'] = `Bearer ${OPINION_API_KEY}`;
+        }
+
         const response = await axios.get(`${OPINION_API}/markets`, {
             params: req.query,
+            headers: headers,
             timeout: 30000
         });
 
@@ -273,8 +286,15 @@ app.get('/api/opinion/events', async (req, res) => {
 // Проксі для Opinion /orderbook endpoint
 app.get('/api/opinion/book', async (req, res) => {
     try {
+        // Add Authorization header if API key is available
+        const headers = {};
+        if (OPINION_API_KEY) {
+            headers['Authorization'] = `Bearer ${OPINION_API_KEY}`;
+        }
+
         const response = await axios.get(`${OPINION_API}/orderbook`, {
             params: req.query,
+            headers: headers,
             timeout: 30000
         });
 
@@ -296,8 +316,15 @@ app.get('/api/opinion/book', async (req, res) => {
 // Проксі для Opinion /prices endpoint
 app.get('/api/opinion/midpoint', async (req, res) => {
     try {
+        // Add Authorization header if API key is available
+        const headers = {};
+        if (OPINION_API_KEY) {
+            headers['Authorization'] = `Bearer ${OPINION_API_KEY}`;
+        }
+
         const response = await axios.get(`${OPINION_API}/prices`, {
             params: req.query,
+            headers: headers,
             timeout: 30000
         });
 

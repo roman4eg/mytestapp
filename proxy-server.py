@@ -8,6 +8,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
 import sys
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Дозволяємо CORS для всіх маршрутів
@@ -16,6 +21,10 @@ POLYMARKET_API = 'https://gamma-api.polymarket.com'
 CLOB_API = 'https://clob.polymarket.com'
 KALSHI_API = 'https://api.elections.kalshi.com/trade-api/v2'
 OPINION_API = 'https://proxy.opinion.trade:8443'
+
+# API Keys from environment variables
+OPINION_API_KEY = os.getenv('OPINION_API_KEY', '')
+KALSHI_API_KEY = os.getenv('KALSHI_API_KEY', '')
 
 @app.route('/')
 def index():
@@ -189,7 +198,13 @@ def get_opinion_markets():
     """Проксі для Opinion /markets endpoint"""
     try:
         params = request.args.to_dict()
-        response = requests.get(f'{OPINION_API}/markets', params=params, timeout=30)
+
+        # Add Authorization header if API key is available
+        headers = {}
+        if OPINION_API_KEY:
+            headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
+
+        response = requests.get(f'{OPINION_API}/markets', params=params, headers=headers, timeout=30)
         return jsonify(response.json()), response.status_code
 
     except requests.exceptions.RequestException as e:
@@ -204,7 +219,13 @@ def get_opinion_orderbook():
     """Проксі для Opinion /orderbook endpoint"""
     try:
         params = request.args.to_dict()
-        response = requests.get(f'{OPINION_API}/orderbook', params=params, timeout=30)
+
+        # Add Authorization header if API key is available
+        headers = {}
+        if OPINION_API_KEY:
+            headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
+
+        response = requests.get(f'{OPINION_API}/orderbook', params=params, headers=headers, timeout=30)
         return jsonify(response.json()), response.status_code
 
     except requests.exceptions.RequestException as e:
@@ -219,7 +240,13 @@ def get_opinion_price():
     """Проксі для Opinion /prices endpoint"""
     try:
         params = request.args.to_dict()
-        response = requests.get(f'{OPINION_API}/prices', params=params, timeout=30)
+
+        # Add Authorization header if API key is available
+        headers = {}
+        if OPINION_API_KEY:
+            headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
+
+        response = requests.get(f'{OPINION_API}/prices', params=params, headers=headers, timeout=30)
         return jsonify(response.json()), response.status_code
 
     except requests.exceptions.RequestException as e:
