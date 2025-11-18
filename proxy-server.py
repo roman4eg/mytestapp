@@ -234,12 +234,26 @@ def get_opinion_markets():
                 # Debug each topic's status
                 status = topic.get('status', None)
                 end_time = topic.get('endTime', 0)
+                resolved_time = topic.get('resolvedTime', 0)
                 current_time = int(time.time())
 
-                print(f"Topic {topic.get('topicId', 'unknown')}: status={status}, endTime={end_time}, current={current_time}", file=sys.stderr)
+                print(f"Topic {topic.get('topicId', 'unknown')}: status={status}, endTime={end_time}, resolvedTime={resolved_time}", file=sys.stderr)
 
-                # Determine if active based on endTime (if endTime is in the future, it's active)
-                is_active = end_time > current_time if end_time else (status == 1)
+                # Determine if active based on Opinion status codes:
+                # status=1: likely draft/pending
+                # status=2: active/open for trading
+                # status=4: resolved/closed
+                # Also check resolvedTime - if present, event is closed
+                if resolved_time and resolved_time > 0:
+                    is_active = False  # Has been resolved
+                elif status == 2:
+                    is_active = True   # Open for trading
+                elif status == 1:
+                    is_active = True   # Pending/draft but might be tradeable
+                else:
+                    is_active = False  # status=4 or other = closed
+
+                print(f"  → Mapped to: active={is_active}, closed={not is_active}", file=sys.stderr)
 
                 # Map Opinion fields to Polymarket-like structure
                 transformed = {
