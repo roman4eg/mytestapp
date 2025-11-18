@@ -206,13 +206,15 @@ def get_opinion_markets():
         if OPINION_API_KEY:
             headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
 
-        # Try different possible endpoints
+        # Try different possible endpoints based on browser network logs
         possible_endpoints = [
+            f'{OPINION_API}/api/bsc/api/v2/markets',
+            f'{OPINION_API}/api/bsc/api/v2/topic',
+            f'{OPINION_API}/api/bsc/api/v2/topics',
+            f'{OPINION_API}/api/bsc/markets',
             f'{OPINION_API}/markets',
             f'{OPINION_API}/api/markets',
-            f'{OPINION_API}/v1/markets',
-            'https://opinion.trade/api/markets',
-            'https://api.opinion.trade/markets'
+            f'{OPINION_API}/v1/markets'
         ]
 
         last_error = None
