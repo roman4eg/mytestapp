@@ -263,25 +263,16 @@ def get_opinion_markets():
 
         print(f"✓ Opinion API: Total retrieved {len(all_events)} topics across {page} pages", file=sys.stderr)
 
-        # Debug: Print first topic to understand structure (only once)
-        if all_events:
-            import json
-            print(f"DEBUG - First topic FULL structure:", file=sys.stderr)
-            # Print full structure without truncation to see all fields
-            print(json.dumps(all_events[0], indent=2, ensure_ascii=False), file=sys.stderr)
-
         events_list = all_events
 
         # Transform Opinion format to match Polymarket structure
         transformed_events = []
         for topic in events_list:
-            # Debug each topic's status
+            # Determine active/closed status
             status = topic.get('status', None)
             end_time = topic.get('endTime', 0)
             resolved_time = topic.get('resolvedTime', 0)
             current_time = int(time.time())
-
-            print(f"Topic {topic.get('topicId', 'unknown')}: status={status}, endTime={end_time}, resolvedTime={resolved_time}", file=sys.stderr)
 
             # Determine if active based on Opinion status codes:
             # status=1: likely draft/pending
@@ -297,11 +288,56 @@ def get_opinion_markets():
             else:
                 is_active = False  # status=4 or other = closed
 
-            print(f"  → Mapped to: active={is_active}, closed={not is_active}", file=sys.stderr)
+            # Extract market data from Opinion topic
+            yes_label = topic.get('yesLabel', 'Yes')
+            no_label = topic.get('noLabel', 'No')
+            yes_price = float(topic.get('yesMarketPrice', 0) or 0)
+            no_price = float(topic.get('noMarketPrice', 0) or 0)
+
+            # If no_price is not set, calculate from yes_price (binary market = prices sum to 1)
+            if yes_price > 0 and no_price == 0:
+                no_price = 1.0 - yes_price
+            elif no_price > 0 and yes_price == 0:
+                yes_price = 1.0 - no_price
+
+            # Create a single market with two outcomes (binary market)
+            question_id = topic.get('questionId', '')
+            topic_id = topic.get('topicId', '')
+
+            markets = [{
+                'id': question_id or str(topic_id),
+                'question': topic.get('title', ''),
+                'outcomes': [yes_label, no_label],
+                'clobTokenIds': [
+                    f"yes_{topic_id}",  # Synthetic token ID for Yes
+                    f"no_{topic_id}"    # Synthetic token ID for No
+                ],
+                'active': is_active,
+                'closed': not is_active,
+                'volume': float(topic.get('volume', 0) or 0)
+            }]
+
+            # Create outcomes with prices
+            outcomes = [
+                {
+                    'outcome': yes_label,
+                    'price': yes_price,
+                    'clobTokenId': f"yes_{topic_id}",
+                    'buyPrice': float(topic.get('yesBuyPrice', 0) or 0),
+                    'sellPrice': float(topic.get('yesSellPrice', 0) or 0),
+                },
+                {
+                    'outcome': no_label,
+                    'price': no_price,
+                    'clobTokenId': f"no_{topic_id}",
+                    'buyPrice': float(topic.get('noBuyPrice', 0) or 0),
+                    'sellPrice': float(topic.get('noSellPrice', 0) or 0),
+                }
+            ]
 
             # Map Opinion fields to Polymarket-like structure
             transformed = {
-                'id': str(topic.get('topicId', '')),
+                'id': str(topic_id),
                 'title': topic.get('title', ''),
                 'description': topic.get('abstract', '') or topic.get('content', ''),
                 'active': is_active,
@@ -309,10 +345,10 @@ def get_opinion_markets():
                 'created': topic.get('createTime', 0),
                 'end_date': end_time,
                 'image': topic.get('coverUrl', ''),
-                'volume': topic.get('volume', 0),
+                'volume': float(topic.get('volume', 0) or 0),
                 'liquidity': 0,  # Opinion might not have this field
-                'markets': [],  # Will need to fetch separately if needed
-                'outcomes': [],  # Will need to map from Opinion's market structure
+                'markets': markets,
+                'outcomes': outcomes,
                 'platform': 'opinion',
                 '_raw': topic  # Keep raw data for debugging
             }
