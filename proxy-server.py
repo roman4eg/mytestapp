@@ -268,6 +268,38 @@ def get_opinion_markets():
 
         print(f"✓ Opinion API: Total retrieved {len(all_events)} topics across {page} pages", file=sys.stderr)
 
+        # Try to fetch current prices for all topics (Opinion's /topic endpoint doesn't include live prices)
+        # Try market ticker or price endpoint
+        try:
+            print(f"Fetching live prices from Opinion API...", file=sys.stderr)
+            # Try different possible price endpoints
+            price_endpoints = [
+                f'{OPINION_API}/api/bsc/api/v2/market/ticker',
+                f'{OPINION_API}/api/bsc/api/v2/ticker',
+                f'{OPINION_API}/api/bsc/api/v2/price',
+                f'{OPINION_API}/api/bsc/api/v2/markets/price',
+            ]
+
+            prices_data = {}
+            for price_endpoint in price_endpoints:
+                try:
+                    print(f"  Trying: {price_endpoint}", file=sys.stderr)
+                    price_response = requests.get(price_endpoint, headers=headers, timeout=10)
+                    if price_response.status_code == 200:
+                        print(f"  ✓ Found price endpoint: {price_endpoint}", file=sys.stderr)
+                        price_data = price_response.json()
+                        print(f"  Response structure: {str(price_data)[:500]}", file=sys.stderr)
+                        # Store for later use
+                        prices_data = price_data
+                        break
+                    else:
+                        print(f"  Status: {price_response.status_code}", file=sys.stderr)
+                except Exception as e:
+                    print(f"  Failed: {str(e)[:100]}", file=sys.stderr)
+                    continue
+        except Exception as e:
+            print(f"Failed to fetch prices: {e}", file=sys.stderr)
+
         events_list = all_events
 
         # Transform Opinion format to match Polymarket structure
