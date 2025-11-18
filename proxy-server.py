@@ -271,56 +271,53 @@ def get_opinion_markets():
 
         events_list = all_events
 
-            # Transform Opinion format to match Polymarket structure
-            transformed_events = []
-            for topic in events_list:
-                # Debug each topic's status
-                status = topic.get('status', None)
-                end_time = topic.get('endTime', 0)
-                resolved_time = topic.get('resolvedTime', 0)
-                current_time = int(time.time())
+        # Transform Opinion format to match Polymarket structure
+        transformed_events = []
+        for topic in events_list:
+            # Debug each topic's status
+            status = topic.get('status', None)
+            end_time = topic.get('endTime', 0)
+            resolved_time = topic.get('resolvedTime', 0)
+            current_time = int(time.time())
 
-                print(f"Topic {topic.get('topicId', 'unknown')}: status={status}, endTime={end_time}, resolvedTime={resolved_time}", file=sys.stderr)
+            print(f"Topic {topic.get('topicId', 'unknown')}: status={status}, endTime={end_time}, resolvedTime={resolved_time}", file=sys.stderr)
 
-                # Determine if active based on Opinion status codes:
-                # status=1: likely draft/pending
-                # status=2: active/open for trading
-                # status=4: resolved/closed
-                # Also check resolvedTime - if present, event is closed
-                if resolved_time and resolved_time > 0:
-                    is_active = False  # Has been resolved
-                elif status == 2:
-                    is_active = True   # Open for trading
-                elif status == 1:
-                    is_active = True   # Pending/draft but might be tradeable
-                else:
-                    is_active = False  # status=4 or other = closed
+            # Determine if active based on Opinion status codes:
+            # status=1: likely draft/pending
+            # status=2: active/open for trading
+            # status=4: resolved/closed
+            # Also check resolvedTime - if present, event is closed
+            if resolved_time and resolved_time > 0:
+                is_active = False  # Has been resolved
+            elif status == 2:
+                is_active = True   # Open for trading
+            elif status == 1:
+                is_active = True   # Pending/draft but might be tradeable
+            else:
+                is_active = False  # status=4 or other = closed
 
-                print(f"  → Mapped to: active={is_active}, closed={not is_active}", file=sys.stderr)
+            print(f"  → Mapped to: active={is_active}, closed={not is_active}", file=sys.stderr)
 
-                # Map Opinion fields to Polymarket-like structure
-                transformed = {
-                    'id': str(topic.get('topicId', '')),
-                    'title': topic.get('title', ''),
-                    'description': topic.get('abstract', '') or topic.get('content', ''),
-                    'active': is_active,
-                    'closed': not is_active,
-                    'created': topic.get('createTime', 0),
-                    'end_date': end_time,
-                    'image': topic.get('coverUrl', ''),
-                    'volume': topic.get('volume', 0),
-                    'liquidity': 0,  # Opinion might not have this field
-                    'markets': [],  # Will need to fetch separately if needed
-                    'outcomes': [],  # Will need to map from Opinion's market structure
-                    'platform': 'opinion',
-                    '_raw': topic  # Keep raw data for debugging
-                }
-                transformed_events.append(transformed)
+            # Map Opinion fields to Polymarket-like structure
+            transformed = {
+                'id': str(topic.get('topicId', '')),
+                'title': topic.get('title', ''),
+                'description': topic.get('abstract', '') or topic.get('content', ''),
+                'active': is_active,
+                'closed': not is_active,
+                'created': topic.get('createTime', 0),
+                'end_date': end_time,
+                'image': topic.get('coverUrl', ''),
+                'volume': topic.get('volume', 0),
+                'liquidity': 0,  # Opinion might not have this field
+                'markets': [],  # Will need to fetch separately if needed
+                'outcomes': [],  # Will need to map from Opinion's market structure
+                'platform': 'opinion',
+                '_raw': topic  # Keep raw data for debugging
+            }
+            transformed_events.append(transformed)
 
-            return jsonify(transformed_events), 200
-        else:
-            print(f"Unexpected Opinion API response structure: {str(data)[:200]}", file=sys.stderr)
-            return jsonify({'error': 'Unexpected API response structure'}), 500
+        return jsonify(transformed_events), 200
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Opinion markets: {e}", file=sys.stderr)
