@@ -206,13 +206,35 @@ def get_opinion_markets():
         if OPINION_API_KEY:
             headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
 
-        # Don't pass any parameters for now to see what Opinion API returns
-        response = requests.get(f'{OPINION_API}/markets', headers=headers, timeout=30)
+        # Try different possible endpoints
+        possible_endpoints = [
+            f'{OPINION_API}/markets',
+            f'{OPINION_API}/api/markets',
+            f'{OPINION_API}/v1/markets',
+            'https://opinion.trade/api/markets',
+            'https://api.opinion.trade/markets'
+        ]
 
-        print(f"Opinion API response status: {response.status_code}", file=sys.stderr)
-        print(f"Opinion API response preview: {str(response.text)[:500]}", file=sys.stderr)
+        last_error = None
+        for endpoint in possible_endpoints:
+            try:
+                print(f"Trying endpoint: {endpoint}", file=sys.stderr)
+                response = requests.get(endpoint, headers=headers, timeout=10)
+                print(f"Status: {response.status_code}, Preview: {str(response.text)[:200]}", file=sys.stderr)
 
-        return jsonify(response.json()), response.status_code
+                if response.status_code == 200:
+                    print(f"✓ Found working endpoint: {endpoint}", file=sys.stderr)
+                    return jsonify(response.json()), response.status_code
+
+            except Exception as e:
+                print(f"Failed: {str(e)[:100]}", file=sys.stderr)
+                last_error = e
+                continue
+
+        # If no endpoint worked, return the last error
+        if last_error:
+            raise last_error
+        return jsonify({'error': 'No working endpoint found'}), 404
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Opinion markets: {e}", file=sys.stderr)
