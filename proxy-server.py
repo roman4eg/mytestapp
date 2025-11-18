@@ -201,45 +201,55 @@ def get_opinion_markets():
         # For now, just get all markets without filters
         # TODO: Map Polymarket parameters to Opinion parameters once we know the API structure
 
-        # Add Authorization header if API key is available
-        headers = {}
-        if OPINION_API_KEY:
-            headers['Authorization'] = f'Bearer {OPINION_API_KEY}'
-            print(f"API Key loaded: {OPINION_API_KEY[:10]}... (length: {len(OPINION_API_KEY)})", file=sys.stderr)
-        else:
+        if not OPINION_API_KEY:
             print("⚠️ WARNING: OPINION_API_KEY not found in environment!", file=sys.stderr)
+            return jsonify({'error': 'API key not configured'}), 500
+
+        print(f"API Key loaded: {OPINION_API_KEY[:10]}... (length: {len(OPINION_API_KEY)})", file=sys.stderr)
 
         # Try different possible endpoints based on browser network logs
         possible_endpoints = [
-            f'{OPINION_API}/api/bsc/api/v2/markets',
             f'{OPINION_API}/api/bsc/api/v2/topic',
+            f'{OPINION_API}/api/bsc/api/v2/markets',
             f'{OPINION_API}/api/bsc/api/v2/topics',
             f'{OPINION_API}/api/bsc/markets',
-            f'{OPINION_API}/markets',
-            f'{OPINION_API}/api/markets',
-            f'{OPINION_API}/v1/markets'
+        ]
+
+        # Try different authentication header formats
+        auth_variants = [
+            {'X-API-Key': OPINION_API_KEY},                     # Common API key header
+            {'Authorization': OPINION_API_KEY},                 # Without Bearer
+            {'Authorization': f'Bearer {OPINION_API_KEY}'},     # With Bearer (standard)
+            {'apikey': OPINION_API_KEY},                        # Simple apikey header
+            {'x-api-key': OPINION_API_KEY},                     # Lowercase variant
+            {'Api-Key': OPINION_API_KEY},                       # Another common variant
         ]
 
         last_error = None
         for endpoint in possible_endpoints:
-            try:
-                print(f"Trying endpoint: {endpoint}", file=sys.stderr)
-                response = requests.get(endpoint, headers=headers, timeout=10)
-                print(f"Status: {response.status_code}, Preview: {str(response.text)[:200]}", file=sys.stderr)
+            for idx, headers in enumerate(auth_variants):
+                try:
+                    auth_method = list(headers.keys())[0]
+                    print(f"Trying endpoint: {endpoint} with {auth_method} header", file=sys.stderr)
+                    response = requests.get(endpoint, headers=headers, timeout=10)
+                    print(f"Status: {response.status_code}, Preview: {str(response.text)[:200]}", file=sys.stderr)
 
-                if response.status_code == 200:
-                    print(f"✓ Found working endpoint: {endpoint}", file=sys.stderr)
-                    return jsonify(response.json()), response.status_code
+                    if response.status_code == 200:
+                        print(f"✓ SUCCESS! Working endpoint: {endpoint} with {auth_method} header", file=sys.stderr)
+                        return jsonify(response.json()), response.status_code
+                    elif response.status_code == 401:
+                        # 401 means endpoint exists but auth is wrong, continue to next auth method
+                        continue
 
-            except Exception as e:
-                print(f"Failed: {str(e)[:100]}", file=sys.stderr)
-                last_error = e
-                continue
+                except Exception as e:
+                    print(f"Failed: {str(e)[:100]}", file=sys.stderr)
+                    last_error = e
+                    continue
 
         # If no endpoint worked, return the last error
         if last_error:
             raise last_error
-        return jsonify({'error': 'No working endpoint found'}), 404
+        return jsonify({'error': 'No working endpoint found - tried all authentication methods'}), 404
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Opinion markets: {e}", file=sys.stderr)
